@@ -86,3 +86,4 @@ gradle-wrapper.jar
 *.tmp
 .DS_Store
 Thumbs.db
+*.apk
