@@ -14,10 +14,12 @@ data class Item(
     val text: String? = null,
     val cleanedText: String? = null,
     val imageUris: List<String> = emptyList(),
+    val thumbnailUrl: String? = null,
     val sourcePackage: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val pinned: Boolean = false,
-    val reminderAt: Long? = null
+    val reminderAt: Long? = null,
+    val label: String? = null
 )
 
 enum class ItemType { TEXT, LINK, IMAGE }
