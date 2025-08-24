@@ -26,6 +26,12 @@ import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
 import androidx.compose.foundation.layout.FlowRow
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+// Icons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Link
 
 @OptIn(ExperimentalLayoutApi::class)
 class ShareBuddyActivity : ComponentActivity() {
@@ -51,7 +57,11 @@ class ShareBuddyActivity : ComponentActivity() {
             ShareBuddyTheme {
                 Surface {
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Filled.Share, contentDescription = "App icon")
+                        Spacer(Modifier.width(8.dp))
                         Text("Share Buddy", style = MaterialTheme.typography.headlineSmall)
+                        }
                         Spacer(Modifier.height(8.dp))
                         if (sharedImages.isNotEmpty()) {
                             Column {
@@ -81,13 +91,29 @@ class ShareBuddyActivity : ComponentActivity() {
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(onClick = { onSave() }, enabled = !isSaving) { Text("Save") }
+                            Button(onClick = { onSave() }, enabled = !isSaving) {
+                                Icon(Icons.Filled.Save, contentDescription = "Save")
+                                Spacer(Modifier.width(6.dp))
+                                Text("Save")
+                            }
                             Button(
                                 onClick = { onCleanAndReshare() },
                                 enabled = sharedText?.startsWith("http", ignoreCase = true) == true && !isSaving
-                            ) { Text("Clean + Re‑share") }
-                            OutlinedButton(onClick = { onRemind() }, enabled = !isSaving) { Text("Remind") }
-                            OutlinedButton(onClick = { onReshare() }) { Text("Re‑share") }
+                            ) {
+                                Icon(Icons.Filled.Link, contentDescription = "Clean and re-share")
+                                Spacer(Modifier.width(6.dp))
+                                Text("Clean + Re-share")
+                            }
+                            OutlinedButton(onClick = { onRemind() }, enabled = !isSaving) {
+                                Icon(Icons.Filled.Alarm, contentDescription = "Remind")
+                                Spacer(Modifier.width(6.dp))
+                                Text("Remind")
+                            }
+                            OutlinedButton(onClick = { onReshare() }) {
+                                Icon(Icons.Filled.Share, contentDescription = "Re-share")
+                                Spacer(Modifier.width(6.dp))
+                                Text("Re-share")
+                            }
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
