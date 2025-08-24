@@ -44,7 +44,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.filled.Alarm
+import java.text.SimpleDateFormat
+import java.util.Date
 
+// Main activity for Share Buddy application
 class MainActivity : ComponentActivity() {
     private val repo by lazy { (application as App).repo }
 
@@ -73,6 +77,10 @@ class MainActivity : ComponentActivity() {
 
                 // Image preview state
                 var previewImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+                // Reminder details state
+                var showReminderDetailsDialog by remember { mutableStateOf(false) }
+                var selectedItemForReminderDetails by remember { mutableStateOf<Item?>(null) }
 
                 LaunchedEffect(query, filter, sortBy) {
                     repo.inbox(query.ifBlank { null }).collectLatest { list ->
@@ -216,7 +224,11 @@ class MainActivity : ComponentActivity() {
                                                 selectedItemForLabel = selectedItem
                                                 showLabelDialog = true
                                             },
-                                            onReshare = { repo.reshare(it) }
+                                            onReshare = { repo.reshare(it) },
+                                            onShowReminderDetails = { itemToShow ->
+                                                selectedItemForReminderDetails = itemToShow
+                                                showReminderDetailsDialog = true
+                                            }
                                         )
                                     }
                                 }
@@ -231,6 +243,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Box(
                                 Modifier
+                                    .padding(pad)
                                     .fillMaxSize()
                             ) {
                                 // Scrim (tap to close)
@@ -314,6 +327,22 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+
+                if (showReminderDetailsDialog && selectedItemForReminderDetails != null) {
+                    val itemForDialog = selectedItemForReminderDetails!! // Explicitly get the item
+                    ReminderDetailsDialog(
+                        item = itemForDialog,
+                        onDismiss = { showReminderDetailsDialog = false },
+                        onCancelReminder = { itemToCancel ->
+                            lifecycleScope.launch {
+                                com.mrunicorn.sb.reminder.ReminderScheduler.cancel(this@MainActivity, itemToCancel.id)
+                                repo.setReminder(itemToCancel.id, null)
+                                Toast.makeText(this@MainActivity, "Reminder cancelled", Toast.LENGTH_SHORT).show()
+                                showReminderDetailsDialog = false // Dismiss dialog after cancellation
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -354,7 +383,8 @@ fun ItemCard(
     onPin: () -> Unit,
     onDelete: () -> Unit,
     onLabelClick: (Item) -> Unit,
-    onReshare: (Item) -> Unit
+    onReshare: (Item) -> Unit,
+    onShowReminderDetails: (Item) -> Unit
 ) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
@@ -419,9 +449,61 @@ fun ItemCard(
             }
             // Row 2: Re-share on its own line (looks cleaner)
             Spacer(Modifier.height(6.dp))
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { // Add horizontalArrangement
                 AssistChip(onClick = { onReshare(item) }, label = { Text("Re-share") })
+                if (item.reminderAt != null) {
+                    IconButton(onClick = { onShowReminderDetails(item) }) {
+                        Icon(
+                            imageVector = Icons.Default.Alarm,
+                            contentDescription = "Reminder set"
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+fun ReminderDetailsDialog(item: Item, onDismiss: () -> Unit, onCancelReminder: (Item) -> Unit) {
+    val remainingTime by remember(item.reminderAt) {
+        if (item.reminderAt == null) {
+            mutableStateOf("No reminder set")
+        } else {
+            val diff = item.reminderAt - System.currentTimeMillis()
+            if (diff <= 0) {
+                mutableStateOf("Reminder overdue")
+            } else {
+                val minutes = diff / (1000 * 60)
+                val hours = minutes / 60
+                val days = hours / 24
+                when {
+                    days > 0 -> mutableStateOf("${days}d ${hours % 24}h remaining")
+                    hours > 0 -> mutableStateOf("${hours}h ${minutes % 60}m remaining")
+                    minutes > 0 -> mutableStateOf("${minutes}m remaining")
+                    else -> mutableStateOf("Less than a minute remaining")
+                }
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reminder Details") },
+        text = {
+            Column {
+                Text("Item: ${item.text ?: item.cleanedText ?: "(No text)"}")
+                Spacer(Modifier.height(8.dp))
+                Text("Time: ${SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(Date(item.reminderAt ?: 0L))}")
+                Spacer(Modifier.height(8.dp))
+                Text("Remaining: $remainingTime")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onCancelReminder(item) }) { Text("Cancel Reminder") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
