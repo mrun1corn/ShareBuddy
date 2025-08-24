@@ -4,18 +4,25 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- First card (bottom) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,30 L80,30 A8,8 0 0 1 88,38 L88,88 A8,8 0 0 1 80,96 L30,96 A8,8 0 0 1 22,88 L22,38 A8,8 0 0 1 30,30 Z" />
+    <group
+        android:scaleX="0.7"
+        android:scaleY="0.7"
+        android:translateX="16.2"
+        android:translateY="16.2">
 
-    <!-- Second card (top, slightly offset) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M20,20 L70,20 A8,8 0 0 1 78,28 L78,78 A8,8 0 0 1 70,86 L20,86 A8,8 0 0 1 12,78 L12,28 A8,8 0 0 1 20,20 Z" />
+        <!-- First card (bottom) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,30 L80,30 A12,12 0 0 1 92,42 L92,88 A12,12 0 0 1 80,100 L30,100 A12,12 0 0 1 18,88 L18,42 A12,12 0 0 1 30,30 Z" />
 
-    <!-- Upward arrow -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,28 L44,38 L49,38 L49,58 L59,58 L59,38 L64,38 Z" />
+        <!-- Second card (top, slightly offset) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M20,20 L70,20 A12,12 0 0 1 82,32 L82,82 A12,12 0 0 1 70,94 L20,94 A12,12 0 0 1 8,82 L8,32 A12,12 0 0 1 20,20 Z" />
+
+        <!-- Upward arrow (minimal) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,30 L44,45 L64,45 Z" />
+    </group>
 </vector>
