@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +38,8 @@ class ShareBuddyActivity : ComponentActivity() {
     private var sharedText: String? = null
     private var sharedImages: List<Uri> = emptyList()
     private var showReminderDialog by mutableStateOf(false)
+    private var labelText by mutableStateOf("")
+    private var lastSavedItemId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +66,14 @@ class ShareBuddyActivity : ComponentActivity() {
                             Text(preview, maxLines = 6, overflow = TextOverflow.Ellipsis)
                         }
                         Spacer(Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = labelText,
+                            onValueChange = { labelText = it },
+                            label = { Text("Label (optional)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(16.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -84,8 +95,8 @@ class ShareBuddyActivity : ComponentActivity() {
                     if (showReminderDialog) {
                         ReminderDialog(
                             onDismiss = { showReminderDialog = false },
-                            onConfirm = { hours ->
-                                scheduleReminder(hours)
+                            onConfirm = { hours, deleteAfterReminder ->
+                                scheduleReminder(hours, deleteAfterReminder)
                                 showReminderDialog = false
                             }
                         )
@@ -124,16 +135,20 @@ class ShareBuddyActivity : ComponentActivity() {
 
     private fun onSave() {
         lifecycleScope.launch {
+            val currentLabel = labelText.ifBlank { null }
             if (!sharedText.isNullOrBlank()) {
-                repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage)
+                val savedItem = repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage, label = currentLabel)
+                lastSavedItemId = savedItem.id
                 Toast.makeText(this@ShareBuddyActivity, "Saved", Toast.LENGTH_SHORT).show()
-                finish()
+                // Do not finish here, allow user to set reminder
             } else if (sharedImages.isNotEmpty()) {
-                repo.saveImages(sharedImages, sourcePkg = callingPackage)
+                val savedItem = repo.saveImages(sharedImages, sourcePkg = callingPackage, label = currentLabel)
+                lastSavedItemId = savedItem.id
                 Toast.makeText(this@ShareBuddyActivity, "Saved images", Toast.LENGTH_SHORT).show()
-                finish()
+                // Do not finish here, allow user to set reminder
             } else {
                 Toast.makeText(this@ShareBuddyActivity, "Nothing to save", Toast.LENGTH_SHORT).show()
+                finish()
             }
         }
     }
@@ -152,18 +167,36 @@ class ShareBuddyActivity : ComponentActivity() {
     }
 
     private fun onRemind() {
-        if (Build.VERSION.SDK_INT >= 33) {
-            requestNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            showReminderDialog = true
+        lifecycleScope.launch {
+            if (lastSavedItemId == null) {
+                val currentLabel = labelText.ifBlank { null }
+                if (!sharedText.isNullOrBlank()) {
+                    val savedItem = repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage, label = currentLabel)
+                    lastSavedItemId = savedItem.id
+                } else if (sharedImages.isNotEmpty()) {
+                    val savedItem = repo.saveImages(sharedImages, sourcePkg = callingPackage, label = currentLabel)
+                    lastSavedItemId = savedItem.id
+                } else {
+                    Toast.makeText(this@ShareBuddyActivity, "Nothing to save for reminder", Toast.LENGTH_SHORT).show()
+                    finish()
+                    return@launch
+                }
+            }
+
+            if (Build.VERSION.SDK_INT >= 33) {
+                requestNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                showReminderDialog = true
+            }
         }
     }
 
-    private fun scheduleReminder(timeInMillis: Long) {
+    private fun scheduleReminder(timeInMillis: Long, deleteAfterReminder: Boolean) {
         val now = System.currentTimeMillis()
         val whenAt = now + timeInMillis
         val title = (sharedText ?: "[${sharedImages.size} image(s)]").take(80)
-        ReminderScheduler.schedule(this, itemId = "$now", title = title, whenAt = whenAt)
+        val itemLabel = labelText.ifBlank { null }
+        ReminderScheduler.schedule(this, itemId = lastSavedItemId!!, title = title, whenAt = whenAt, deleteAfterReminder = deleteAfterReminder, label = itemLabel)
         Toast.makeText(this, "Reminder set!", Toast.LENGTH_SHORT).show()
         finish()
     }
@@ -191,9 +224,10 @@ class ShareBuddyActivity : ComponentActivity() {
 }
 
 @Composable
-fun ReminderDialog(onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
+fun ReminderDialog(onDismiss: () -> Unit, onConfirm: (Long, Boolean) -> Unit) {
     var inputValue by remember { mutableStateOf("") }
     var selectedUnit by remember { mutableStateOf(ReminderUnit.HOURS) }
+    var deleteAfterReminder by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -223,6 +257,14 @@ fun ReminderDialog(onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
                         )
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = deleteAfterReminder,
+                        onCheckedChange = { deleteAfterReminder = it }
+                    )
+                    Text("Delete after reminder closes")
+                }
             }
         },
         confirmButton = {
@@ -235,7 +277,7 @@ fun ReminderDialog(onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
                             ReminderUnit.HOURS -> value * 60 * 60 * 1000L
                             ReminderUnit.DAYS -> value * 24 * 60 * 60 * 1000L
                         }
-                        onConfirm(timeInMillis)
+                        onConfirm(timeInMillis, deleteAfterReminder)
                     } else {
                         // Optionally show an error message
                     }

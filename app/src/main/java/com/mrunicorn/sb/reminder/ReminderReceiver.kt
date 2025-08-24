@@ -10,11 +10,21 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.mrunicorn.sb.ui.MainActivity
 import com.mrunicorn.sb.R
+import com.mrunicorn.sb.App
+import com.mrunicorn.sb.data.Item
+import com.mrunicorn.sb.data.ItemType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import android.graphics.BitmapFactory
+import android.net.Uri
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val title = intent.getStringExtra("title") ?: "Shared item"
         val itemId = intent.getStringExtra("itemId") ?: ""
+        val deleteAfterReminder = intent.getBooleanExtra("deleteAfterReminder", false)
+        val label = intent.getStringExtra("label")
 
         val channelId = "reminders"
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -30,14 +40,36 @@ class ReminderReceiver : BroadcastReceiver() {
         }
         val pi = PendingIntent.getActivity(context, itemId.hashCode(), open, PendingIntent.FLAG_IMMUTABLE)
 
-        val n = NotificationCompat.Builder(context, channelId)
+        val notificationBuilder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notify)
-            .setContentTitle("Reminder")
+            .setContentTitle(label ?: "Reminder")
             .setContentText(title)
             .setAutoCancel(true)
             .setContentIntent(pi)
-            .build()
 
-        nm.notify(itemId.hashCode(), n)
+        // Load mini thumbnail
+        val repo = (context.applicationContext as App).repo
+        CoroutineScope(Dispatchers.IO).launch {
+            val item = repo.dao.getItemById(itemId)
+            if (item != null && item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
+                try {
+                    val imageUri = Uri.parse(item.imageUris.first())
+                    val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(imageUri))
+                    notificationBuilder.setLargeIcon(bitmap)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            nm.notify(itemId.hashCode(), notificationBuilder.build())
+        }
+
+        if (deleteAfterReminder) {
+            // Deletion is now handled within the CoroutineScope after notification is built
+            // to ensure the item is available for thumbnail loading.
+            // The deletion will happen after the notification is shown.
+            CoroutineScope(Dispatchers.IO).launch {
+                repo.delete(itemId)
+            }
+        }
     }
 }

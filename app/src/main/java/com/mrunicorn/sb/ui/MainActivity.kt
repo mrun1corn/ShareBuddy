@@ -25,6 +25,7 @@ import com.mrunicorn.sb.data.ItemType
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -212,7 +213,8 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
                 AsyncImage(
                     model = item.imageUris.first(),
                     contentDescription = "Shared image",
-                    modifier = Modifier.fillMaxWidth().height(200.dp)
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.height(8.dp))
             } else if (item.type == ItemType.LINK && !item.thumbnailUrl.isNullOrBlank()) {
@@ -226,7 +228,7 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
             val title = when (item.type) {
                 ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
                 ItemType.TEXT -> item.text ?: "(text)"
-                ItemType.IMAGE -> "[${item.imageUris.size} image(s)]"
+                ItemType.IMAGE -> if (item.imageUris.size == 1) "[Image]" else "[${item.imageUris.size} image(s)]"
             }
             Text(title, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
             if (!item.label.isNullOrBlank()) {
