@@ -53,7 +53,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val item = repo.dao.getItemById(itemId)
             if (item != null && item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
                 try {
-                    val imageUri = Uri.parse(item.imageUris.first())
+                    val imageUri = item.imageUris.first()
                     val bitmap = BitmapFactory.decodeStream(context.contentResolver.openInputStream(imageUri))
                     notificationBuilder.setLargeIcon(bitmap)
                 } catch (e: Exception) {
