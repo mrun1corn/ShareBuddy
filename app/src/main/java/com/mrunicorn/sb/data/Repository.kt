@@ -28,38 +28,75 @@ class Repository(private val context: Context, val dao: ItemDao) {
         return item
     }
 
-    suspend fun saveImages(uris: List<Uri>, sourcePkg: String? = null, label: String? = null): Item {
+    suspend fun saveImages(
+        uris: List<Uri>,
+        sourcePkg: String? = null,
+        label: String? = null
+    ): Item {
         val resolver = context.contentResolver
         val mtm = MimeTypeMap.getSingleton()
-        val imageUrisToSave = uris.map { uri ->
-            try {
-                resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-                val mime = resolver.getType(uri)
+        val imageUrisToSave = uris.map { src ->
+            try {
+                // Persist permission on the *incoming* shared content URI (if possible)
+                if (src.scheme == "content") {
+                    try {
+                        resolver.takePersistableUriPermission(
+                            src,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: SecurityException) {
+                        // Some share intents don't include persistable flags; safe to ignore.
+                    }
+                }
+
+                // Work out the extension from MIME type
+                val mime = resolver.getType(src)
                 val ext = mime?.let { mtm.getExtensionFromMimeType(it) }
 
                 if (ext != null) {
+                    // (Optional, but recommended) keep images in a subfolder
+                    val imagesDir = File(context.filesDir, "images").apply { mkdirs() }
                     val fileName = "image_${System.currentTimeMillis()}.$ext"
-                    val file = File(context.filesDir, fileName)
-                    resolver.openInputStream(uri)?.use { inputStream ->
-                        file.outputStream().use { outputStream ->
-                            inputStream.copyTo(outputStream)
-                        }
+                    val file = File(imagesDir, fileName)
+
+                    resolver.openInputStream(src)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
                     }
-                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+
+                    // Wrap with FileProvider and *grant* read permission to our own app/process
+                    val fpUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    context.grantUriPermission(
+                        context.packageName,
+                        fpUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+
+                    fpUri
                 } else {
-                    // Unknown type; fall back to original URI
-                    uri
+                    // Unknown type; fall back to original content URI
+                    src
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                uri
+                src
             }
         }
-        val item = Item(type = ItemType.IMAGE, imageUris = imageUrisToSave, sourcePackage = sourcePkg, label = label)
+
+        val item = Item(
+            type = ItemType.IMAGE,
+            imageUris = imageUrisToSave,
+            sourcePackage = sourcePkg,
+            label = label
+        )
         dao.upsert(item)
         return item
     }
+
     suspend fun delete(id: String) = dao.delete(id)
     suspend fun pin(id: String, pinned: Boolean) = dao.setPinned(id, pinned)
 

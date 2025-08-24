@@ -44,7 +44,7 @@
 
     <provider
         android:name="androidx.core.content.FileProvider"
-        android:authorities="com.mrunicorn.sb.fileprovider"
+        android:authorities="${applicationId}.fileprovider"
         android:exported="false"
         android:grantUriPermissions="true">
         <meta-data
@@ -54,4 +54,6 @@
   </application>
 
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.INTERNET" />
+
 </manifest>
