@@ -90,3 +90,6 @@ class Repository(private val context: Context, val dao: ItemDao) {
         }
     }
 }
+
+enum class ItemFilter { All, Links, Text, Images }
+enum class ItemSort { Date, Name, Label }

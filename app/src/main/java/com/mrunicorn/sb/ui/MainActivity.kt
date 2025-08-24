@@ -51,9 +51,6 @@ class MainActivity : ComponentActivity() {
                 var sortBy by remember { mutableStateOf(ItemSort.Date) }
                 val items = remember { mutableStateListOf<Item>() }
                 val lazyListState = rememberLazyListState()
-                var showAllItems by remember { mutableStateOf(false) }
-                var showLabelDialog by remember { mutableStateOf(false) }
-                var selectedItemForLabel by remember { mutableStateOf<Item?>(null) }
 
                 LaunchedEffect(query, filter, sortBy) {
                     repo.inbox(query.ifBlank { null }).collectLatest { list ->
@@ -96,7 +93,6 @@ class MainActivity : ComponentActivity() {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(selected = sortBy == ItemSort.Date, onClick = { sortBy = ItemSort.Date }, label = { Text("Date") })
                             FilterChip(selected = sortBy == ItemSort.Name, onClick = { sortBy = ItemSort.Name }, label = { Text("Name") })
-                            FilterChip(selected = sortBy == ItemSort.Label, onClick = { sortBy = ItemSort.Label }, label = { Text("Label") })
                         }
                         Spacer(Modifier.height(12.dp))
                         if (items.isEmpty()) {
@@ -113,12 +109,11 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } else {
-                            val displayedItems = if (showAllItems) items else items.take(4)
                             LazyColumn(
                                 state = lazyListState,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(displayedItems, key = { it.id }) { item ->
+                                items(items, key = { it.id }) { item ->
                                     ItemCard(
                                         item = item,
                                         onCopy = {
@@ -126,78 +121,21 @@ class MainActivity : ComponentActivity() {
                                             if (!text.isNullOrBlank()) repo.copyToClipboard(text)
                                         },
                                         onPin = { lifecycleScope.launch { repo.pin(item.id, !item.pinned) } },
-                                        onDelete = { lifecycleScope.launch { repo.delete(item.id) } },
-                                        onLabelClick = { selectedItem ->
-                                            selectedItemForLabel = selectedItem
-                                            showLabelDialog = true
-                                        }
+                                        onDelete = { lifecycleScope.launch { repo.delete(item.id) } }
                                     )
-                                }
-                                if (!showAllItems && items.size > 4) {
-                                    item {
-                                        Button(
-                                            onClick = { showAllItems = true },
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                                        ) {
-                                            Text("Show More")
-                                        }
-                                    }
                                 }
                             }
                         }
                     }
-                }
-
-                if (showLabelDialog && selectedItemForLabel != null) {
-                    LabelDialog(
-                        item = selectedItemForLabel!!,
-                        onDismiss = { showLabelDialog = false },
-                        onConfirm = { item, label ->
-                            lifecycleScope.launch { repo.updateLabel(item.id, label) }
-                            showLabelDialog = false
-                        }
-                    )
                 }
             }
         }
     }
 }
 
-@Composable
-fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) -> Unit) {
-    var labelText by remember { mutableStateOf(item.label ?: "") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Label") },
-        text = {
-            OutlinedTextField(
-                value = labelText,
-                onValueChange = { labelText = it },
-                label = { Text("Label") },
-                singleLine = true
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(item, labelText.ifBlank { null }) }
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            Button(
-                onClick = onDismiss
-            ) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit, onLabelClick: (Item) -> Unit) {
+fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
             if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
@@ -232,7 +170,6 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
                 AssistChip(onClick = onCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
-                AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
             }
         }
     }

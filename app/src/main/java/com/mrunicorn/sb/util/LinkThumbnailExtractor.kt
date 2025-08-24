@@ -1,41 +1,28 @@
 package com.mrunicorn.sb.util
 
-import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Document
 
 object LinkThumbnailExtractor {
-    private const val TIMEOUT = 5000
+    private val USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Mobile Safari/537.36"
 
     suspend fun extractThumbnailUrl(url: String): String? = withContext(Dispatchers.IO) {
         try {
-            val response = Jsoup.connect(url)
-                .timeout(TIMEOUT)
-                .followRedirects(true)
-                .ignoreContentType(true)
-                .execute()
-            if (response.statusCode() != 200) return@withContext null
-            return@withContext parseThumbnailFromDocument(response.parse())
+            val doc = Jsoup.connect(url).userAgent(USER_AGENT).get()
+            val ogImage = doc.selectFirst("meta[property=og:image]")?.attr("content")
+            if (ogImage != null && (ogImage.startsWith("http://") || ogImage.startsWith("https://"))) return@withContext ogImage
+
+            val image = doc.selectFirst("link[rel=image_src]")?.attr("href")
+            if (image != null && (image.startsWith("http://") || image.startsWith("https://"))) return@withContext image
+
+            val twitterImage = doc.selectFirst("meta[name=twitter:image]")?.attr("content")
+            if (twitterImage != null && (twitterImage.startsWith("http://") || twitterImage.startsWith("https://"))) return@withContext twitterImage
+
+            null
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
-    }
-
-    @VisibleForTesting
-    internal fun parseThumbnailFromHtml(html: String, baseUri: String = ""): String? {
-        val document = Jsoup.parse(html, baseUri)
-        return parseThumbnailFromDocument(document)
-    }
-
-    private fun parseThumbnailFromDocument(document: Document): String? {
-        val element = document.selectFirst("meta[property=og:image], meta[name=twitter:image]")
-            ?: return null
-        val content = element.attr("content")
-        if (content.isNullOrBlank()) return null
-        val abs = element.absUrl("content")
-        return if (abs.isNotBlank()) abs else content
     }
 }
