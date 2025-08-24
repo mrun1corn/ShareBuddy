@@ -1,0 +1,4 @@
+<resources>
+    <!-- App theme based on Material 3 -->
+    <style name="Theme.ShareBuddy" parent="Theme.Material3.DayNight.NoActionBar" />
+</resources>

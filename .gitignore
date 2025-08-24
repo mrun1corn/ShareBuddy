@@ -1,0 +1,88 @@
+# Built application files
+*.apk
+*.ap_
+*.aab
+*.aar
+*.o
+*.so
+*.iml
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+build/
+.gradle/
+.idea/
+.kotlin/
+local.properties
+.DS_Store
+*.log
+captures/
+.externalNativeBuild/
+.cxx/
+.navigation/
+
+# Local configuration file (sdk location)
+local.properties
+
+# Gradle files
+.gradle/
+build/
+
+# Android Studio and IntelliJ IDEA files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Keystore files
+*.jks
+*.keystore
+
+# NDK
+.externalNativeBuild/
+
+# Crashlytics
+crashlytics-build.properties
+
+# Google Services (e.g. Firebase)
+google-services.json
+
+# Room Persistence Library
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Android Profiling
+*.trace
+
+# Android Lint
+lint-results.html
+lint-results.xml
+
+# Test results
+test-results/
+
+# AVD
+.android/avd/
+
+# Gradle wrapper
+gradle-wrapper.jar
+
+# Kotlin
+.kotlin/
+
+# Unnecessary files
+*.bak
+*.swp
+*~
+*.tmp
+.DS_Store
+Thumbs.db
