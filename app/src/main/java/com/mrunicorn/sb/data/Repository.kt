@@ -113,6 +113,13 @@ class Repository(private val context: Context, val dao: ItemDao) {
         val cm = context.getSystemService(ClipboardManager::class.java)
         cm.setPrimaryClip(ClipData.newPlainText("ShareBuddy", text))
     }
+    
+    fun copyImageToClipboard(imageUri: android.net.Uri) {
+    val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+    val clip = android.content.ClipData.newUri(context.contentResolver, "ShareBuddy Image", imageUri)
+    cm.setPrimaryClip(clip)
+    }
+
     companion object {
         fun sortAndFilter(list: List<Item>, filter: ItemFilter, sort: ItemSort): List<Item> {
             val sorted = when (sort) {

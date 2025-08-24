@@ -3,32 +3,32 @@ package com.mrunicorn.sb.ui
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import coil.compose.AsyncImage
 import com.mrunicorn.sb.App
 import com.mrunicorn.sb.data.Item
-import com.mrunicorn.sb.data.ItemType
 import com.mrunicorn.sb.data.ItemFilter
 import com.mrunicorn.sb.data.ItemSort
+import com.mrunicorn.sb.data.ItemType
 import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
-import androidx.compose.material3.ExperimentalMaterial3Api
-import coil.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -37,7 +37,8 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     private val repo by lazy { (application as App).repo }
 
-    private val requestNotif = registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
+    private val requestNotif =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,13 +73,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-
                 Scaffold(
                     topBar = {
                         CenterAlignedTopAppBar(title = { Text("Share Buddy") })
                     }
                 ) { pad ->
-                    Column(Modifier.padding(pad).fillMaxSize().padding(16.dp)) {
+                    Column(
+                        Modifier
+                            .padding(pad)
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
                         OutlinedTextField(
                             value = query,
                             onValueChange = { query = it },
@@ -87,15 +92,39 @@ class MainActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = filter == ItemFilter.All, onClick = { filter = ItemFilter.All }, label = { Text("All") })
-                            FilterChip(selected = filter == ItemFilter.Links, onClick = { filter = ItemFilter.Links }, label = { Text("Links") })
-                            FilterChip(selected = filter == ItemFilter.Text, onClick = { filter = ItemFilter.Text }, label = { Text("Text") })
-                            FilterChip(selected = filter == ItemFilter.Images, onClick = { filter = ItemFilter.Images }, label = { Text("Images") })
+                            FilterChip(
+                                selected = filter == ItemFilter.All,
+                                onClick = { filter = ItemFilter.All },
+                                label = { Text("All") }
+                            )
+                            FilterChip(
+                                selected = filter == ItemFilter.Links,
+                                onClick = { filter = ItemFilter.Links },
+                                label = { Text("Links") }
+                            )
+                            FilterChip(
+                                selected = filter == ItemFilter.Text,
+                                onClick = { filter = ItemFilter.Text },
+                                label = { Text("Text") }
+                            )
+                            FilterChip(
+                                selected = filter == ItemFilter.Images,
+                                onClick = { filter = ItemFilter.Images },
+                                label = { Text("Images") }
+                            )
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(selected = sortBy == ItemSort.Date, onClick = { sortBy = ItemSort.Date }, label = { Text("Date") })
-                            FilterChip(selected = sortBy == ItemSort.Name, onClick = { sortBy = ItemSort.Name }, label = { Text("Name") })
+                            FilterChip(
+                                selected = sortBy == ItemSort.Date,
+                                onClick = { sortBy = ItemSort.Date },
+                                label = { Text("Date") }
+                            )
+                            FilterChip(
+                                selected = sortBy == ItemSort.Name,
+                                onClick = { sortBy = ItemSort.Name },
+                                label = { Text("Name") }
+                            )
                         }
                         Spacer(Modifier.height(12.dp))
                         if (items.isEmpty()) {
@@ -121,10 +150,30 @@ class MainActivity : ComponentActivity() {
                                         item = item,
                                         onCopy = {
                                             val text = item.cleanedText ?: item.text
-                                            if (!text.isNullOrBlank()) repo.copyToClipboard(text)
+                                            if (!text.isNullOrBlank()) {
+                                                // Copy text case
+                                                repo.copyToClipboard(text)
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Copied to clipboard",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
+                                                // Copy image case — copies the first image URI
+                                                repo.copyImageToClipboard(item.imageUris.first())
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    "Image copied to clipboard",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
                                         },
-                                        onPin = { lifecycleScope.launch { repo.pin(item.id, !item.pinned) } },
-                                        onDelete = { lifecycleScope.launch { repo.delete(item.id) } },
+                                        onPin = {
+                                            lifecycleScope.launch { repo.pin(item.id, !item.pinned) }
+                                        },
+                                        onDelete = {
+                                            lifecycleScope.launch { repo.delete(item.id) }
+                                        },
                                         onLabelClick = { selectedItem ->
                                             selectedItemForLabel = selectedItem
                                             showLabelDialog = true
@@ -169,25 +218,26 @@ fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) ->
         confirmButton = {
             Button(
                 onClick = { onConfirm(item, labelText.ifBlank { null }) }
-            ) {
-                Text("Save")
-            }
+            ) { Text("Save") }
         },
         dismissButton = {
-            Button(
-                onClick = onDismiss
-            ) {
-                Text("Cancel")
-            }
+            Button(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit, onLabelClick: (Item) -> Unit) {
+fun ItemCard(
+    item: Item,
+    onCopy: () -> Unit,
+    onPin: () -> Unit,
+    onDelete: () -> Unit,
+    onLabelClick: (Item) -> Unit
+) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
+            // Preview: Images or Link thumbnail
             if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
                 AsyncImage(
                     model = item.imageUris.first(),
@@ -204,20 +254,37 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
                 )
                 Spacer(Modifier.height(8.dp))
             }
+
+            // Title
             val title = when (item.type) {
                 ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
                 ItemType.TEXT -> item.text ?: "(text)"
                 ItemType.IMAGE -> "[${item.imageUris.size} image(s)]"
             }
-            Text(title, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
+            Text(
+                title,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium
+            )
 
             if (!item.label.isNullOrBlank()) {
-                Text(item.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.height(4.dp))
             }
             Spacer(Modifier.height(8.dp))
+
+            // Enable Copy if there's text OR at least one image
+            val hasTextToCopy = !((item.cleanedText ?: item.text).isNullOrBlank())
+            val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
+            val canCopy = hasTextToCopy || hasImageToCopy
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = onCopy, label = { Text("Copy") })
+                AssistChip(onClick = onCopy, enabled = canCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
                 AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
