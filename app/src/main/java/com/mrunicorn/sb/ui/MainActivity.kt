@@ -61,6 +61,10 @@ class MainActivity : ComponentActivity() {
                 var showLabelDialog by remember { mutableStateOf(false) }
                 var selectedItemForLabel by remember { mutableStateOf<Item?>(null) }
 
+                // Delete confirmation state
+                var showDeleteDialog by remember { mutableStateOf(false) }
+                var itemToDelete by remember { mutableStateOf<Item?>(null) }
+
                 // Image preview state
                 var previewImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
@@ -191,7 +195,8 @@ class MainActivity : ComponentActivity() {
                                                 lifecycleScope.launch { repo.pin(item.id, !item.pinned) }
                                             },
                                             onDelete = {
-                                                lifecycleScope.launch { repo.delete(item.id) }
+                                                itemToDelete = item
+                                                showDeleteDialog = true
                                             },
                                             onLabelClick = { selectedItem ->
                                                 selectedItemForLabel = selectedItem
@@ -263,6 +268,35 @@ class MainActivity : ComponentActivity() {
                         onConfirm = { item, label ->
                             lifecycleScope.launch { repo.updateLabel(item.id, label) }
                             showLabelDialog = false
+                        }
+                    )
+                }
+
+                // Delete confirmation dialog
+                if (showDeleteDialog && itemToDelete != null) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            showDeleteDialog = false
+                            itemToDelete = null
+                        },
+                        title = { Text("Delete item?") },
+                        text = { Text("Are you sure you want to delete this item? This action can't be undone.") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val id = itemToDelete!!.id
+                                lifecycleScope.launch {
+                                    repo.delete(id)
+                                    Toast.makeText(this@MainActivity, "Deleted", Toast.LENGTH_SHORT).show()
+                                }
+                                showDeleteDialog = false
+                                itemToDelete = null
+                            }) { Text("Delete") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                itemToDelete = null
+                            }) { Text("Cancel") }
                         }
                     )
                 }
@@ -362,7 +396,7 @@ fun ItemCard(
             val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
             val canCopy = hasTextToCopy || hasImageToCopy
 
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = onCopy, enabled = canCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
