@@ -228,9 +228,10 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
             val title = when (item.type) {
                 ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
                 ItemType.TEXT -> item.text ?: "(text)"
-                ItemType.IMAGE -> if (item.imageUris.size == 1) "[Image]" else "[${item.imageUris.size} image(s)]"
+                ItemType.IMAGE -> item.label ?: ""
             }
             Text(title, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
+
             if (!item.label.isNullOrBlank()) {
                 Text(item.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))

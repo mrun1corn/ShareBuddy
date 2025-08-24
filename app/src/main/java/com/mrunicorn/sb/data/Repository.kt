@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import java.io.File
 import com.mrunicorn.sb.util.LinkCleaner
 import com.mrunicorn.sb.util.LinkThumbnailExtractor
@@ -27,7 +28,7 @@ class Repository(private val context: Context, val dao: ItemDao) {
     }
 
     suspend fun saveImages(uris: List<Uri>, sourcePkg: String? = null, label: String? = null): Item {
-        val imageUrisToSave = uris.mapNotNull { uri ->
+        val imageUrisToSave = uris.map { uri ->
             try {
                 // Attempt to take persistent permission
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -40,17 +41,18 @@ class Repository(private val context: Context, val dao: ItemDao) {
                         inputStream.copyTo(outputStream)
                     }
                 }
-                Uri.fromFile(file).toString()
+                // If successful, return the FileProvider URI
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
+                // If copying fails, return the original URI as a fallback
+                uri
             }
         }
         val item = Item(type = ItemType.IMAGE, imageUris = imageUrisToSave, sourcePackage = sourcePkg, label = label)
         dao.upsert(item)
         return item
     }
-
     suspend fun delete(id: String) = dao.delete(id)
     suspend fun pin(id: String, pinned: Boolean) = dao.setPinned(id, pinned)
 
