@@ -14,6 +14,9 @@ interface ItemDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: Item)
 
+    @Query("SELECT * FROM Item WHERE id = :id")
+    suspend fun getItemById(id: String): Item?
+
     @Query("UPDATE Item SET pinned = :pinned WHERE id = :id")
     suspend fun setPinned(id: String, pinned: Boolean)
 

@@ -1,17 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group android:translateX="24" android:translateY="24">
-        <!-- First abstract shape (e.g., a rounded rectangle) -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M10 4L20 4A2 2 0 0 1 22 6L22 16A2 2 0 0 1 20 18L10 18A2 2 0 0 1 8 16L8 6A2 2 0 0 1 10 4Z" />
-        <!-- Second abstract shape, slightly offset and overlapping -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M2 8L12 8A2 2 0 0 1 14 10L14 20A2 2 0 0 1 12 22L2 22A2 2 0 0 1 0 20L0 10A2 2 0 0 1 2 8Z" />
-    </group>
+
+    <!-- First card (bottom) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,30 L80,30 A8,8 0 0 1 88,38 L88,88 A8,8 0 0 1 80,96 L30,96 A8,8 0 0 1 22,88 L22,38 A8,8 0 0 1 30,30 Z" />
+
+    <!-- Second card (top, slightly offset) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,20 L70,20 A8,8 0 0 1 78,28 L78,78 A8,8 0 0 1 70,86 L20,86 A8,8 0 0 1 12,78 L12,28 A8,8 0 0 1 20,20 Z" />
+
+    <!-- Upward arrow -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 L44,38 L49,38 L49,58 L59,58 L59,38 L64,38 Z" />
 </vector>
