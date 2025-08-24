@@ -1,37 +1,41 @@
 package com.mrunicorn.sb.util
 
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 
 object LinkThumbnailExtractor {
-
-    private val OG_IMAGE_REGEX = "<meta property=\"og:image\" content=\"(.*?)\">".toRegex()
+    private const val TIMEOUT = 5000
 
     suspend fun extractThumbnailUrl(url: String): String? = withContext(Dispatchers.IO) {
         try {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                BufferedReader(InputStreamReader(connection.inputStream)).use { bufferedReader ->
-                    var line: String?
-                    while (bufferedReader.readLine().also { line = it } != null) {
-                        val matchResult = OG_IMAGE_REGEX.find(line!!)
-                        if (matchResult != null) {
-                            return@withContext matchResult.groupValues[1]
-                        }
-                    }
-                }
-            }
+            val response = Jsoup.connect(url)
+                .timeout(TIMEOUT)
+                .followRedirects(true)
+                .ignoreContentType(true)
+                .execute()
+            if (response.statusCode() != 200) return@withContext null
+            return@withContext parseThumbnailFromDocument(response.parse())
         } catch (e: Exception) {
             e.printStackTrace()
+            null
         }
-        return@withContext null
+    }
+
+    @VisibleForTesting
+    internal fun parseThumbnailFromHtml(html: String, baseUri: String = ""): String? {
+        val document = Jsoup.parse(html, baseUri)
+        return parseThumbnailFromDocument(document)
+    }
+
+    private fun parseThumbnailFromDocument(document: Document): String? {
+        val element = document.selectFirst("meta[property=og:image], meta[name=twitter:image]")
+            ?: return null
+        val content = element.attr("content")
+        if (content.isNullOrBlank()) return null
+        val abs = element.absUrl("content")
+        return if (abs.isNotBlank()) abs else content
     }
 }

@@ -65,4 +65,10 @@ dependencies {
 
   // Optional image previews
   implementation("io.coil-kt:coil-compose:2.7.0")
+
+  // HTML parsing
+  implementation("org.jsoup:jsoup:1.17.2")
+
+  // Testing
+  testImplementation("junit:junit:4.13.2")
 }

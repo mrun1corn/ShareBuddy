@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.File
 import com.mrunicorn.sb.util.LinkCleaner
@@ -28,24 +29,30 @@ class Repository(private val context: Context, val dao: ItemDao) {
     }
 
     suspend fun saveImages(uris: List<Uri>, sourcePkg: String? = null, label: String? = null): Item {
+        val resolver = context.contentResolver
+        val mtm = MimeTypeMap.getSingleton()
         val imageUrisToSave = uris.map { uri ->
             try {
-                // Attempt to take persistent permission
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-                // Copy image to internal storage
-                val fileName = "image_${System.currentTimeMillis()}.jpg"
-                val file = File(context.filesDir, fileName)
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    file.outputStream().use { outputStream ->
-                        inputStream.copyTo(outputStream)
+                val mime = resolver.getType(uri)
+                val ext = mime?.let { mtm.getExtensionFromMimeType(it) }
+
+                if (ext != null) {
+                    val fileName = "image_${System.currentTimeMillis()}.$ext"
+                    val file = File(context.filesDir, fileName)
+                    resolver.openInputStream(uri)?.use { inputStream ->
+                        file.outputStream().use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
                     }
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                } else {
+                    // Unknown type; fall back to original URI
+                    uri
                 }
-                // If successful, return the FileProvider URI
-                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             } catch (e: Exception) {
                 e.printStackTrace()
-                // If copying fails, return the original URI as a fallback
                 uri
             }
         }
@@ -66,5 +73,20 @@ class Repository(private val context: Context, val dao: ItemDao) {
     fun copyToClipboard(text: String) {
         val cm = context.getSystemService(ClipboardManager::class.java)
         cm.setPrimaryClip(ClipData.newPlainText("ShareBuddy", text))
+    }
+    companion object {
+        fun sortAndFilter(list: List<Item>, filter: ItemFilter, sort: ItemSort): List<Item> {
+            val sorted = when (sort) {
+                ItemSort.Date -> list.sortedByDescending { it.createdAt }
+                ItemSort.Name -> list.sortedBy { it.text ?: "" }
+                ItemSort.Label -> list.sortedBy { it.label ?: "" }
+            }
+            return when (filter) {
+                ItemFilter.All -> sorted
+                ItemFilter.Links -> sorted.filter { it.type == ItemType.LINK }
+                ItemFilter.Text -> sorted.filter { it.type == ItemType.TEXT }
+                ItemFilter.Images -> sorted.filter { it.type == ItemType.IMAGE }
+            }
+        }
     }
 }
