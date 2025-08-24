@@ -7,16 +7,21 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,6 +61,9 @@ class MainActivity : ComponentActivity() {
                 var showLabelDialog by remember { mutableStateOf(false) }
                 var selectedItemForLabel by remember { mutableStateOf<Item?>(null) }
 
+                // Image preview state
+                var previewImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
                 LaunchedEffect(query, filter, sortBy) {
                     repo.inbox(query.ifBlank { null }).collectLatest { list ->
                         val processed = withContext(Dispatchers.Default) {
@@ -78,107 +86,170 @@ class MainActivity : ComponentActivity() {
                         CenterAlignedTopAppBar(title = { Text("Share Buddy") })
                     }
                 ) { pad ->
-                    Column(
+                    // When preview is open, blur the underlying content
+                    val baseBlur = if (previewImageUri != null) 16.dp else 0.dp
+
+                    Box(
                         Modifier
                             .padding(pad)
                             .fillMaxSize()
-                            .padding(16.dp)
                     ) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            placeholder = { Text("Search saved items…") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = filter == ItemFilter.All,
-                                onClick = { filter = ItemFilter.All },
-                                label = { Text("All") }
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                                .blur(baseBlur)
+                        ) {
+                            OutlinedTextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                placeholder = { Text("Search saved items…") },
+                                modifier = Modifier.fillMaxWidth()
                             )
-                            FilterChip(
-                                selected = filter == ItemFilter.Links,
-                                onClick = { filter = ItemFilter.Links },
-                                label = { Text("Links") }
-                            )
-                            FilterChip(
-                                selected = filter == ItemFilter.Text,
-                                onClick = { filter = ItemFilter.Text },
-                                label = { Text("Text") }
-                            )
-                            FilterChip(
-                                selected = filter == ItemFilter.Images,
-                                onClick = { filter = ItemFilter.Images },
-                                label = { Text("Images") }
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = sortBy == ItemSort.Date,
-                                onClick = { sortBy = ItemSort.Date },
-                                label = { Text("Date") }
-                            )
-                            FilterChip(
-                                selected = sortBy == ItemSort.Name,
-                                onClick = { sortBy = ItemSort.Name },
-                                label = { Text("Name") }
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        if (items.isEmpty()) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Inbox,
-                                        contentDescription = "Empty inbox icon",
-                                        modifier = Modifier.size(64.dp),
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                    Text("No items yet — Share to Share Buddy from any app.")
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = filter == ItemFilter.All,
+                                    onClick = { filter = ItemFilter.All },
+                                    label = { Text("All") }
+                                )
+                                FilterChip(
+                                    selected = filter == ItemFilter.Links,
+                                    onClick = { filter = ItemFilter.Links },
+                                    label = { Text("Links") }
+                                )
+                                FilterChip(
+                                    selected = filter == ItemFilter.Text,
+                                    onClick = { filter = ItemFilter.Text },
+                                    label = { Text("Text") }
+                                )
+                                FilterChip(
+                                    selected = filter == ItemFilter.Images,
+                                    onClick = { filter = ItemFilter.Images },
+                                    label = { Text("Images") }
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = sortBy == ItemSort.Date,
+                                    onClick = { sortBy = ItemSort.Date },
+                                    label = { Text("Date") }
+                                )
+                                FilterChip(
+                                    selected = sortBy == ItemSort.Name,
+                                    onClick = { sortBy = ItemSort.Name },
+                                    label = { Text("Name") }
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            if (items.isEmpty()) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Inbox,
+                                            contentDescription = "Empty inbox icon",
+                                            modifier = Modifier.size(64.dp),
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                        Spacer(Modifier.height(16.dp))
+                                        Text("No items yet — Share to Share Buddy from any app.")
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = lazyListState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(items, key = { it.id }) { item ->
+                                        ItemCard(
+                                            item = item,
+                                            onCopy = {
+                                                val text = item.cleanedText ?: item.text
+                                                if (!text.isNullOrBlank()) {
+                                                    // Copy text
+                                                    repo.copyToClipboard(text)
+                                                    Toast.makeText(
+                                                        this@MainActivity,
+                                                        "Copied to clipboard",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                } else if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
+                                                    // Copy image
+                                                    repo.copyImageToClipboard(item.imageUris.first())
+                                                    Toast.makeText(
+                                                        this@MainActivity,
+                                                        "Image copied to clipboard",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            },
+                                            onImageClick = { uri ->
+                                                previewImageUri = uri
+                                            },
+                                            onPin = {
+                                                lifecycleScope.launch { repo.pin(item.id, !item.pinned) }
+                                            },
+                                            onDelete = {
+                                                lifecycleScope.launch { repo.delete(item.id) }
+                                            },
+                                            onLabelClick = { selectedItem ->
+                                                selectedItemForLabel = selectedItem
+                                                showLabelDialog = true
+                                            },
+                                            onReshare = { repo.reshare(it) }
+                                        )
+                                    }
                                 }
                             }
-                        } else {
-                            LazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier.fillMaxSize()
+                        }
+
+                        // Preview overlay
+                        if (previewImageUri != null) {
+                            // Dimmed scrim (click to close)
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.35f))
+                                    .clickable { previewImageUri = null }
+                            )
+
+                            // Centered image container (80% of screen)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                items(items, key = { it.id }) { item ->
-                                    ItemCard(
-                                        item = item,
-                                        onCopy = {
-                                            val text = item.cleanedText ?: item.text
-                                            if (!text.isNullOrBlank()) {
-                                                // Copy text case
-                                                repo.copyToClipboard(text)
-                                                Toast.makeText(
-                                                    this@MainActivity,
-                                                    "Copied to clipboard",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            } else if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
-                                                // Copy image case — copies the first image URI
-                                                repo.copyImageToClipboard(item.imageUris.first())
-                                                Toast.makeText(
-                                                    this@MainActivity,
-                                                    "Image copied to clipboard",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        },
-                                        onPin = {
-                                            lifecycleScope.launch { repo.pin(item.id, !item.pinned) }
-                                        },
-                                        onDelete = {
-                                            lifecycleScope.launch { repo.delete(item.id) }
-                                        },
-                                        onLabelClick = { selectedItem ->
-                                            selectedItemForLabel = selectedItem
-                                            showLabelDialog = true
+                                Surface(
+                                    tonalElevation = 6.dp,
+                                    shape = MaterialTheme.shapes.large,
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .fillMaxSize(0.8f) // 80% of visible screen
+                                ) {
+                                    Box(Modifier.fillMaxSize()) {
+                                        AsyncImage(
+                                            model = previewImageUri,
+                                            contentDescription = "Preview image",
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(8.dp),
+                                            contentScale = ContentScale.Fit
+                                        )
+
+                                        // Close button
+                                        IconButton(
+                                            onClick = { previewImageUri = null },
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Close,
+                                                contentDescription = "Close preview"
+                                            )
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -231,9 +302,11 @@ fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) ->
 fun ItemCard(
     item: Item,
     onCopy: () -> Unit,
+    onImageClick: (android.net.Uri) -> Unit,
     onPin: () -> Unit,
     onDelete: () -> Unit,
-    onLabelClick: (Item) -> Unit
+    onLabelClick: (Item) -> Unit,
+    onReshare: (Item) -> Unit
 ) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
@@ -242,7 +315,10 @@ fun ItemCard(
                 AsyncImage(
                     model = item.imageUris.first(),
                     contentDescription = "Shared image",
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clickable { onImageClick(item.imageUris.first()) }, // tap-to-preview
                     contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.height(8.dp))
@@ -250,7 +326,10 @@ fun ItemCard(
                 AsyncImage(
                     model = item.thumbnailUrl,
                     contentDescription = "Link thumbnail",
-                    modifier = Modifier.fillMaxWidth().height(150.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    contentScale = ContentScale.Crop
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -283,11 +362,12 @@ fun ItemCard(
             val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
             val canCopy = hasTextToCopy || hasImageToCopy
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 AssistChip(onClick = onCopy, enabled = canCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
                 AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
+                AssistChip(onClick = { onReshare(item) }, label = { Text("Re-share") })
             }
         }
     }

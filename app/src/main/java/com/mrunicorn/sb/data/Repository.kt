@@ -113,11 +113,45 @@ class Repository(private val context: Context, val dao: ItemDao) {
         val cm = context.getSystemService(ClipboardManager::class.java)
         cm.setPrimaryClip(ClipData.newPlainText("ShareBuddy", text))
     }
-    
-    fun copyImageToClipboard(imageUri: android.net.Uri) {
-    val cm = context.getSystemService(android.content.ClipboardManager::class.java)
-    val clip = android.content.ClipData.newUri(context.contentResolver, "ShareBuddy Image", imageUri)
-    cm.setPrimaryClip(clip)
+
+    fun copyImageToClipboard(imageUri: Uri) {
+        val cm = context.getSystemService(ClipboardManager::class.java)
+        val clip = ClipData.newUri(context.contentResolver, "ShareBuddy Image", imageUri)
+        cm.setPrimaryClip(clip)
+    }
+
+    /** Re-share the given item via Android's share sheet. */
+    fun reshare(item: Item) {
+        val shareIntent = Intent().apply {
+            action = if (item.type == ItemType.IMAGE && item.imageUris.size > 1) {
+                Intent.ACTION_SEND_MULTIPLE
+            } else {
+                Intent.ACTION_SEND
+            }
+
+            when (item.type) {
+                ItemType.TEXT, ItemType.LINK -> {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, item.cleanedText ?: item.text ?: "")
+                }
+                ItemType.IMAGE -> {
+                    type = "image/*"
+                    if (item.imageUris.size > 1) {
+                        putParcelableArrayListExtra(
+                            Intent.EXTRA_STREAM,
+                            java.util.ArrayList(item.imageUris)
+                        )
+                    } else {
+                        putExtra(Intent.EXTRA_STREAM, item.imageUris.firstOrNull())
+                    }
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            }
+        }
+
+        val chooser = Intent.createChooser(shareIntent, "Share with")
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(chooser)
     }
 
     companion object {
