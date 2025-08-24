@@ -70,6 +70,8 @@ class Repository(private val context: Context, val dao: ItemDao) {
         }
     }
 
+    suspend fun setReminder(id: String, reminderAt: Long?) = dao.setReminder(id, reminderAt)
+
     fun copyToClipboard(text: String) {
         val cm = context.getSystemService(ClipboardManager::class.java)
         cm.setPrimaryClip(ClipData.newPlainText("ShareBuddy", text))

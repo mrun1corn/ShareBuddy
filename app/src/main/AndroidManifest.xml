@@ -40,6 +40,7 @@
     </activity>
 
     <receiver android:name=".reminder.ReminderReceiver" android:exported="false" />
+    <receiver android:name=".reminder.ReminderActionReceiver" android:exported="false" />
 
     <provider
         android:name="androidx.core.content.FileProvider"

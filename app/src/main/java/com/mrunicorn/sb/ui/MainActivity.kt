@@ -52,6 +52,9 @@ class MainActivity : ComponentActivity() {
                 val items = remember { mutableStateListOf<Item>() }
                 val lazyListState = rememberLazyListState()
 
+                var showLabelDialog by remember { mutableStateOf(false) }
+                var selectedItemForLabel by remember { mutableStateOf<Item?>(null) }
+
                 LaunchedEffect(query, filter, sortBy) {
                     repo.inbox(query.ifBlank { null }).collectLatest { list ->
                         val processed = withContext(Dispatchers.Default) {
@@ -121,21 +124,68 @@ class MainActivity : ComponentActivity() {
                                             if (!text.isNullOrBlank()) repo.copyToClipboard(text)
                                         },
                                         onPin = { lifecycleScope.launch { repo.pin(item.id, !item.pinned) } },
-                                        onDelete = { lifecycleScope.launch { repo.delete(item.id) } }
+                                        onDelete = { lifecycleScope.launch { repo.delete(item.id) } },
+                                        onLabelClick = { selectedItem ->
+                                            selectedItemForLabel = selectedItem
+                                            showLabelDialog = true
+                                        }
                                     )
                                 }
                             }
                         }
                     }
                 }
+
+                if (showLabelDialog && selectedItemForLabel != null) {
+                    LabelDialog(
+                        item = selectedItemForLabel!!,
+                        onDismiss = { showLabelDialog = false },
+                        onConfirm = { item, label ->
+                            lifecycleScope.launch { repo.updateLabel(item.id, label) }
+                            showLabelDialog = false
+                        }
+                    )
+                }
             }
         }
     }
 }
 
+@Composable
+fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) -> Unit) {
+    var labelText by remember { mutableStateOf(item.label ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Label") },
+        text = {
+            OutlinedTextField(
+                value = labelText,
+                onValueChange = { labelText = it },
+                label = { Text("Label") },
+                singleLine = true
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(item, labelText.ifBlank { null }) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onDismiss
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit) {
+fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> Unit, onLabelClick: (Item) -> Unit) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
             if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
@@ -157,7 +207,7 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
             val title = when (item.type) {
                 ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
                 ItemType.TEXT -> item.text ?: "(text)"
-                ItemType.IMAGE -> item.label ?: ""
+                ItemType.IMAGE -> "[${item.imageUris.size} image(s)]"
             }
             Text(title, maxLines = 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
 
@@ -170,6 +220,7 @@ fun ItemCard(item: Item, onCopy: () -> Unit, onPin: () -> Unit, onDelete: () -> 
                 AssistChip(onClick = onCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
+                AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
             }
         }
     }

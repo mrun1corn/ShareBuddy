@@ -156,10 +156,11 @@ class ShareBuddyActivity : ComponentActivity() {
     private fun onCleanAndReshare() {
         lifecycleScope.launch {
             val t = sharedText ?: return@launch
-            repo.saveTextOrLink(t.trim(), sourcePkg = callingPackage)
+            val cleaned = com.mrunicorn.sb.util.LinkCleaner.clean(t.trim())
+            repo.saveTextOrLink(cleaned, sourcePkg = callingPackage)
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, t.trim())
+                putExtra(Intent.EXTRA_TEXT, cleaned)
             }
             startActivity(Intent.createChooser(share, "Share cleaned link"))
             finish()
@@ -167,14 +168,25 @@ class ShareBuddyActivity : ComponentActivity() {
     }
 
     private fun onRemind() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            requestNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            showReminderDialog = true
+        }
+    }
+
+    private fun scheduleReminder(timeInMillis: Long, deleteAfterReminder: Boolean) {
         lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            val whenAt = now + timeInMillis
+            val itemLabel = labelText.ifBlank { null }
+
             if (lastSavedItemId == null) {
-                val currentLabel = labelText.ifBlank { null }
                 if (!sharedText.isNullOrBlank()) {
-                    val savedItem = repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage, label = currentLabel)
+                    val savedItem = repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage, label = itemLabel)
                     lastSavedItemId = savedItem.id
                 } else if (sharedImages.isNotEmpty()) {
-                    val savedItem = repo.saveImages(sharedImages, sourcePkg = callingPackage, label = currentLabel)
+                    val savedItem = repo.saveImages(sharedImages, sourcePkg = callingPackage, label = itemLabel)
                     lastSavedItemId = savedItem.id
                 } else {
                     Toast.makeText(this@ShareBuddyActivity, "Nothing to save for reminder", Toast.LENGTH_SHORT).show()
@@ -183,22 +195,12 @@ class ShareBuddyActivity : ComponentActivity() {
                 }
             }
 
-            if (Build.VERSION.SDK_INT >= 33) {
-                requestNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                showReminderDialog = true
-            }
+            repo.setReminder(lastSavedItemId!!, whenAt)
+            val title = (sharedText ?: "[${sharedImages.size} image(s)]").take(80)
+            ReminderScheduler.schedule(this@ShareBuddyActivity, itemId = lastSavedItemId!!, title = title, whenAt = whenAt, deleteAfterReminder = deleteAfterReminder, label = itemLabel)
+            Toast.makeText(this@ShareBuddyActivity, "Reminder set!", Toast.LENGTH_SHORT).show()
+            finish()
         }
-    }
-
-    private fun scheduleReminder(timeInMillis: Long, deleteAfterReminder: Boolean) {
-        val now = System.currentTimeMillis()
-        val whenAt = now + timeInMillis
-        val title = (sharedText ?: "[${sharedImages.size} image(s)]").take(80)
-        val itemLabel = labelText.ifBlank { null }
-        ReminderScheduler.schedule(this, itemId = lastSavedItemId!!, title = title, whenAt = whenAt, deleteAfterReminder = deleteAfterReminder, label = itemLabel)
-        Toast.makeText(this, "Reminder set!", Toast.LENGTH_SHORT).show()
-        finish()
     }
 
     private fun onReshare() {

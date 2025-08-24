@@ -12,14 +12,26 @@ import com.mrunicorn.sb.ui.MainActivity
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val itemId = intent.getStringExtra("id") ?: return
-        val text = intent.getStringExtra("text")
+        val itemId = intent.getStringExtra("itemId") ?: return
+        val text = intent.getStringExtra("title")
 
         val tapIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("openItemId", itemId)
         }
         val pending = PendingIntent.getActivity(context, itemId.hashCode(), tapIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val copyIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_COPY
+            putExtra("itemId", itemId)
+        }
+        val copyPendingIntent = PendingIntent.getBroadcast(context, itemId.hashCode(), copyIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val shareIntent = Intent(context, ReminderActionReceiver::class.java).apply {
+            action = ReminderActionReceiver.ACTION_SHARE
+            putExtra("itemId", itemId)
+        }
+        val sharePendingIntent = PendingIntent.getBroadcast(context, itemId.hashCode(), shareIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val nm = context.getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL_ID) == null) {
@@ -31,6 +43,8 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSmallIcon(R.drawable.ic_notify)
             .setContentIntent(pending)
             .setAutoCancel(true)
+            .addAction(R.drawable.ic_notify, "Copy", copyPendingIntent)
+            .addAction(R.drawable.ic_notify, "Share", sharePendingIntent)
             .build()
         nm.notify(itemId.hashCode(), notif)
     }
