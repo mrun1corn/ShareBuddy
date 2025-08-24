@@ -7,6 +7,11 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,13 +91,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // 👇 App bar that hides on scroll down and re-shows on scroll up
+                val topAppBarState = rememberTopAppBarState()
+                val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+
                 Scaffold(
+                    modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                     topBar = {
-                        CenterAlignedTopAppBar(title = { Text("Share Buddy") })
+                        CenterAlignedTopAppBar(
+                            title = { Text("Share Buddy") },
+                            scrollBehavior = scrollBehavior
+                        )
                     }
                 ) { pad ->
-                    // When preview is open, blur the underlying content
-                    val baseBlur = if (previewImageUri != null) 16.dp else 0.dp
+                    // When preview is open, blur the underlying content a bit
+                    val baseBlur = if (previewImageUri != null) 12.dp else 0.dp
 
                     Box(
                         Modifier
@@ -209,51 +223,51 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // Preview overlay
-                        if (previewImageUri != null) {
-                            // Dimmed scrim (click to close)
+                        // 🔍 Fullscreen preview overlay with animation
+                        AnimatedVisibility(
+                            visible = previewImageUri != null,
+                            enter = fadeIn() + scaleIn(initialScale = 0.98f),
+                            exit = fadeOut() + scaleOut(targetScale = 0.98f)
+                        ) {
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.35f))
-                                    .clickable { previewImageUri = null }
-                            )
-
-                            // Centered image container (80% of screen)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                contentAlignment = Alignment.Center
                             ) {
-                                Surface(
-                                    tonalElevation = 6.dp,
-                                    shape = MaterialTheme.shapes.large,
-                                    color = MaterialTheme.colorScheme.surface,
-                                    modifier = Modifier
-                                        .fillMaxSize(0.8f) // 80% of visible screen
-                                ) {
-                                    Box(Modifier.fillMaxSize()) {
-                                        AsyncImage(
-                                            model = previewImageUri,
-                                            contentDescription = "Preview image",
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .padding(8.dp),
-                                            contentScale = ContentScale.Fit
-                                        )
+                                // Scrim (tap to close)
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.6f))
+                                        .clickable { previewImageUri = null }
+                                )
 
-                                        // Close button
-                                        IconButton(
-                                            onClick = { previewImageUri = null },
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Close,
-                                                contentDescription = "Close preview"
-                                            )
-                                        }
+                                // Fullscreen image
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = previewImageUri,
+                                        contentDescription = "Preview image",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(8.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+
+                                    // Close button
+                                    IconButton(
+                                        onClick = { previewImageUri = null },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Close preview",
+                                            tint = Color.White
+                                        )
                                     }
                                 }
                             }
@@ -372,7 +386,7 @@ fun ItemCard(
             val title = when (item.type) {
                 ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
                 ItemType.TEXT -> item.text ?: "(text)"
-                ItemType.IMAGE -> "[${item.imageUris.size} image(s)]"
+                ItemType.IMAGE -> ""
             }
             Text(
                 title,
@@ -396,11 +410,16 @@ fun ItemCard(
             val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
             val canCopy = hasTextToCopy || hasImageToCopy
 
+            // Row 1: main actions (Copy / Pin / Delete / Label)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = onCopy, enabled = canCopy, label = { Text("Copy") })
                 AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
                 AssistChip(onClick = onDelete, label = { Text("Delete") })
                 AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
+            }
+            // Row 2: Re-share on its own line (looks cleaner)
+            Spacer(Modifier.height(6.dp))
+            Row {
                 AssistChip(onClick = { onReshare(item) }, label = { Text("Re-share") })
             }
         }
