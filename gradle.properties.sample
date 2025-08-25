@@ -1,0 +1,15 @@
+### Sample release signing properties (DO NOT commit real secrets)
+# Copy this file to ~/.gradle/gradle.properties or create a local gradle.properties
+# and fill in the actual values. Use an absolute path for the keystore file.
+
+# Path to your keystore file (JKS or PKCS12)
+RELEASE_STORE_FILE=/home/your-user/keystores/sharebuddy-release.jks
+
+# Keystore password
+RELEASE_STORE_PASSWORD=YourStorePassword
+
+# Key alias inside the keystore
+RELEASE_KEY_ALIAS=sharebuddy
+
+# Key password
+RELEASE_KEY_PASSWORD=YourKeyPassword

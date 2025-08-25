@@ -17,6 +17,29 @@ android {
     versionName = "1.0"
   }
 
+  // Signing configuration: reads from gradle.properties when available.
+  signingConfigs {
+    create("release") {
+      val storeFileProp = project.findProperty("RELEASE_STORE_FILE") as String?
+      if (!storeFileProp.isNullOrBlank()) {
+        storeFile = file(storeFileProp)
+        storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?) ?: ""
+        keyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?) ?: ""
+        keyPassword = (project.findProperty("RELEASE_KEY_PASSWORD") as String?) ?: ""
+      } else {
+        // Fallback for portability: use the local debug keystore if present.
+        // This is suitable for testing on a new machine but NOT for production.
+        val debugKeystore = file("${System.getProperty("user.home")}/.android/debug.keystore")
+        if (debugKeystore.exists()) {
+          storeFile = debugKeystore
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
+      }
+    }
+  }
+
   buildTypes {
     release {
       isMinifyEnabled = true
@@ -25,6 +48,14 @@ android {
         getDefaultProguardFile("proguard-android-optimize.txt"),
         "proguard-rules.pro"
       )
+  // Use the signing config named "release" (defined below).
+  // To provide a real release keystore, set these properties in
+  // `gradle.properties` (do NOT commit secrets):
+  // RELEASE_STORE_FILE=/absolute/path/to/keystore.jks
+  // RELEASE_STORE_PASSWORD=your_store_password
+  // RELEASE_KEY_ALIAS=your_key_alias
+  // RELEASE_KEY_PASSWORD=your_key_password
+  signingConfig = signingConfigs.getByName("release")
     }
     debug {
       applicationIdSuffix = ".debug"

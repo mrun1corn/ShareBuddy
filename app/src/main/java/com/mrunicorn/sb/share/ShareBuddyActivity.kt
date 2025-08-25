@@ -230,7 +230,7 @@ class ShareBuddyActivity : ComponentActivity() {
 
             val now = System.currentTimeMillis()
             val whenAt = now + timeInMillis
-            val title = (sharedText ?: "[${sharedImages.size} image(s)]").take(80)
+            val title = sharedText?.take(80) ?: "New reminder"
             val itemLabel = labelText.ifBlank { null }
 
             repo.setReminder(id, whenAt)

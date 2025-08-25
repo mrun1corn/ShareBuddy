@@ -56,5 +56,7 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+  <!-- For Android 13+ (API 33/34) -->
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM" /> 
 
 </manifest>

@@ -214,16 +214,3 @@ class ReminderReceiver : BroadcastReceiver() {
         return Bitmap.createScaledBitmap(src, nw, nh, true)
     }
 
-    private fun notificationId(itemId: String) = 0x10000000 or (itemId.hashCode() and 0x0FFFFFFF)
-
-    companion object {
-        const val CHANNEL_ID = "reminders"
-        const val ACTION_FIRE = "com.mrunicorn.sb.reminder.ACTION_FIRE"
-        const val ACTION_DONE = "com.mrunicorn.sb.reminder.ACTION_DONE"
-        const val ACTION_SNOOZE = "com.mrunicorn.sb.reminder.ACTION_SNOOZE"
-        const val EXTRA_ITEM_ID = "extra_item_id"
-        const val EXTRA_TITLE = "extra_title"
-        const val EXTRA_DELETE_AFTER = "extra_delete_after"
-        const val EXTRA_LABEL = "extra_label"
-    }
-}

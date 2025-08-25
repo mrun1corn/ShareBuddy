@@ -38,6 +38,42 @@ To build the application, navigate to the project root directory and run the fol
 
 The debug APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
+## Signing and release
+
+To produce an installable release APK you must sign it with a keystore. Do NOT commit the keystore or passwords to the repository.
+
+1) Create a keystore (interactive):
+
+```bash
+keytool -genkeypair \
+	-v \
+	-keystore $HOME/keystores/sharebuddy-release.jks \
+	-alias sharebuddy \
+	-keyalg RSA \
+	-keysize 2048 \
+	-validity 10000
+```
+
+2) Add the following to your user Gradle properties `~/.gradle/gradle.properties` (recommended) or to your CI secrets. Use an absolute path for `RELEASE_STORE_FILE`:
+
+```
+RELEASE_STORE_FILE=/home/robin/keystores/sharebuddy-release.jks
+RELEASE_STORE_PASSWORD=YourStorePassword
+RELEASE_KEY_ALIAS=sharebuddy
+RELEASE_KEY_PASSWORD=YourKeyPassword
+```
+
+3) Run the release build (Gradle will pick up the properties and sign):
+
+```bash
+./gradlew assembleRelease
+```
+
+Notes:
+- The project contains a fallback that uses the local debug keystore for portability/testing only; this is not suitable for Play Store publishing.
+- In CI, inject the keystore and properties with secure variables and create a `gradle.properties` on the runner or pass them with `-P`.
+- If you only need to test installing locally and do not want to set up signing, you can use the debug APK produced by `assembleDebug`.
+
 ## Features
 - Share Target for text/links/images
 - **Save** to inbox; **Pin**; **Search**; **Filters** (All / Links / Text / Images)
