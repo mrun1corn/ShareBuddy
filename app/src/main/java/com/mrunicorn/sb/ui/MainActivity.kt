@@ -493,23 +493,15 @@ fun ItemCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { // Add horizontalArrangement
                 AssistChip(onClick = { onReshare(item) }, label = { Text("Re-share") })
                 val now = System.currentTimeMillis()
-                when {
-                    item.reminderAt == null -> {
-                        AssistChip(onClick = { onAddReminder(item) }, label = { Text("Reminder") })
+                if (item.reminderAt != null && item.reminderAt > now) {
+                    IconButton(onClick = { onShowReminderDetails(item) }) {
+                        Icon(
+                            imageVector = Icons.Default.Alarm,
+                            contentDescription = "Reminder set"
+                        )
                     }
-                    item.reminderAt != null && item.reminderAt!! <= now -> {
-                        // Reminder finished/overdue: hide the alarm icon entirely
-                        // (no UI element shown here)
-                    }
-                    else -> {
-                        // Active future reminder
-                        IconButton(onClick = { onShowReminderDetails(item) }) {
-                            Icon(
-                                imageVector = Icons.Default.Alarm,
-                                contentDescription = "Reminder set"
-                            )
-                        }
-                    }
+                } else {
+                    AssistChip(onClick = { onAddReminder(item) }, label = { Text("Reminder") })
                 }
             }
         }
