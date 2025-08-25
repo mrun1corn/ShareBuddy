@@ -40,6 +40,8 @@ import com.mrunicorn.sb.data.ItemSort
 import com.mrunicorn.sb.data.ItemType
 import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
+import com.mrunicorn.sb.share.ReminderDialog
+import com.mrunicorn.sb.share.ReminderDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -81,6 +83,9 @@ class MainActivity : ComponentActivity() {
                 // Reminder details state
                 var showReminderDetailsDialog by remember { mutableStateOf(false) }
                 var selectedItemForReminderDetails by remember { mutableStateOf<Item?>(null) }
+                // Add reminder (set later) state
+                var showAddReminderDialog by remember { mutableStateOf(false) }
+                var selectedItemForAddReminder by remember { mutableStateOf<Item?>(null) }
 
                 LaunchedEffect(query, filter, sortBy) {
                     repo.inbox(query.ifBlank { null }).collectLatest { list ->
@@ -229,6 +234,10 @@ class MainActivity : ComponentActivity() {
                                                 selectedItemForReminderDetails = itemToShow
                                                 showReminderDetailsDialog = true
                                             }
+                                            ,onAddReminder = { laterItem ->
+                                                selectedItemForAddReminder = laterItem
+                                                showAddReminderDialog = true
+                                            }
                                         )
                                     }
                                 }
@@ -343,6 +352,37 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+
+                // Add reminder dialog (set a reminder later)
+                if (showAddReminderDialog && selectedItemForAddReminder != null) {
+                    val itemForDialog = selectedItemForAddReminder!!
+                    ReminderDialog(
+                        onDismiss = {
+                            showAddReminderDialog = false
+                            selectedItemForAddReminder = null
+                        },
+                        onConfirm = { millis, deleteAfterReminder ->
+                            // Schedule reminder similar to ShareBuddyActivity
+                            lifecycleScope.launch {
+                                val now = System.currentTimeMillis()
+                                val whenAt = now + millis
+                                val title = itemForDialog.cleanedText?.take(80) ?: itemForDialog.text?.take(80) ?: "Reminder"
+                                repo.setReminder(itemForDialog.id, whenAt)
+                                com.mrunicorn.sb.reminder.ReminderScheduler.schedule(
+                                    this@MainActivity,
+                                    itemId = itemForDialog.id,
+                                    title = title,
+                                    whenAt = whenAt,
+                                    deleteAfterReminder = deleteAfterReminder,
+                                    label = itemForDialog.label
+                                )
+                                Toast.makeText(this@MainActivity, "Reminder set!", Toast.LENGTH_SHORT).show()
+                                showAddReminderDialog = false
+                                selectedItemForAddReminder = null
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -385,6 +425,7 @@ fun ItemCard(
     onLabelClick: (Item) -> Unit,
     onReshare: (Item) -> Unit,
     onShowReminderDetails: (Item) -> Unit
+    ,onAddReminder: (Item) -> Unit
 ) {
     Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Column(Modifier.padding(12.dp)) {
@@ -451,12 +492,23 @@ fun ItemCard(
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { // Add horizontalArrangement
                 AssistChip(onClick = { onReshare(item) }, label = { Text("Re-share") })
-                if (item.reminderAt != null) {
-                    IconButton(onClick = { onShowReminderDetails(item) }) {
-                        Icon(
-                            imageVector = Icons.Default.Alarm,
-                            contentDescription = "Reminder set"
-                        )
+                val now = System.currentTimeMillis()
+                when {
+                    item.reminderAt == null -> {
+                        AssistChip(onClick = { onAddReminder(item) }, label = { Text("Reminder") })
+                    }
+                    item.reminderAt != null && item.reminderAt!! <= now -> {
+                        // Reminder finished/overdue: hide the alarm icon entirely
+                        // (no UI element shown here)
+                    }
+                    else -> {
+                        // Active future reminder
+                        IconButton(onClick = { onShowReminderDetails(item) }) {
+                            Icon(
+                                imageVector = Icons.Default.Alarm,
+                                contentDescription = "Reminder set"
+                            )
+                        }
                     }
                 }
             }
@@ -492,8 +544,11 @@ fun ReminderDetailsDialog(item: Item, onDismiss: () -> Unit, onCancelReminder: (
         title = { Text("Reminder Details") },
         text = {
             Column {
-                Text("Item: ${item.text ?: item.cleanedText ?: "(No text)"}")
-                Spacer(Modifier.height(8.dp))
+                val displayText = item.text ?: item.cleanedText
+                if (!displayText.isNullOrBlank()) {
+                    Text("Item: $displayText")
+                    Spacer(Modifier.height(8.dp))
+                }
                 Text("Time: ${SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(Date(item.reminderAt ?: 0L))}")
                 Spacer(Modifier.height(8.dp))
                 Text("Remaining: $remainingTime")

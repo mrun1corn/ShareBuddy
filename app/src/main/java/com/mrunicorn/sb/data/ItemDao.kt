@@ -28,4 +28,8 @@ interface ItemDao {
 
     @Query("UPDATE item SET reminderAt = :reminderAt WHERE id = :id")
     suspend fun setReminder(id: String, reminderAt: Long?)
+
+    // One-shot read for background tasks (not a Flow)
+    @Query("SELECT * FROM item ORDER BY createdAt DESC")
+    suspend fun observeAllOnce(): List<Item>
 }
