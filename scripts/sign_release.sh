@@ -29,7 +29,7 @@ if [[ ${1:-} == "-h" || ${1:-} == "--help" ]]; then
   exit 0
 fi
 
-BUILD_TOOLS_VERSION=${BUILD_TOOLS_VERSION:-33.0.2}
+BUILD_TOOLS_VERSION=${BUILD_TOOLS_VERSION:-$(ls -1 "$SDK/build-tools" | tail -n 1)}
 SDK=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}
 if [[ -z "$SDK" ]]; then
   echo "ERROR: ANDROID_SDK_ROOT or ANDROID_HOME must be set." >&2

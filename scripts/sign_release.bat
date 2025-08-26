@@ -4,7 +4,10 @@ setlocal enabledelayedexpansion
 rem Usage: sign_release.bat [APK_PATH] [ALIGNED_OUT] [SIGNED_OUT]
 
 set BUILD_TOOLS_VERSION=%BUILD_TOOLS_VERSION%
-if "%BUILD_TOOLS_VERSION%"=="" set BUILD_TOOLS_VERSION=33.0.2
+if "%BUILD_TOOLS_VERSION%"=="" (
+  for /d %%i in (%ANDROID_SDK_ROOT%\build-tools\*) do set LATEST_BUILD_TOOLS=%%i
+  for %%i in (!LATEST_BUILD_TOOLS!) do set BUILD_TOOLS_VERSION=%%~nxi
+)
 
 if not defined ANDROID_SDK_ROOT if defined ANDROID_HOME set ANDROID_SDK_ROOT=%ANDROID_HOME%
 if not defined ANDROID_SDK_ROOT (
