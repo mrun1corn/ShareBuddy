@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<!-- Pick a brand color here -->
-<color name="ic_launcher_background">#0EA5E9</color>
+    <color name="ic_launcher_background">@color/ic_launcher_background_color</color>
 </resources>
