@@ -199,8 +199,6 @@ class ShareBuddyActivity : ComponentActivity() {
         lifecycleScope.launch {
             val t = sharedText ?: return@launch
             val cleaned = com.mrunicorn.sb.util.LinkCleaner.clean(t.trim())
-            // Optionally also save the cleaned link (kept to match previous behavior)
-            repo.saveTextOrLink(cleaned, sourcePkg = callingPackage)
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, cleaned)

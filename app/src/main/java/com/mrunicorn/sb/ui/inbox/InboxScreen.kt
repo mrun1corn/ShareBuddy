@@ -1,5 +1,7 @@
 package com.mrunicorn.sb.ui.inbox
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -26,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Close
@@ -565,12 +568,34 @@ fun ItemCard(
                     ItemType.TEXT -> item.text ?: "(text)"
                     ItemType.IMAGE -> item.label ?: "Image"
                 }
-                Text(
-                    title,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium
-                )
+                val context = LocalContext.current
+                if (item.type == ItemType.LINK && title.isNotBlank()) {
+                    Text(
+                        title,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            val target = Uri.parse(item.cleanedText ?: item.text)
+                            val intent = Intent(Intent.ACTION_VIEW, target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, "No app to open link", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                } else {
+                    SelectionContainer {
+                        Text(
+                            title,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
 
                 Spacer(Modifier.height(8.dp))
 
