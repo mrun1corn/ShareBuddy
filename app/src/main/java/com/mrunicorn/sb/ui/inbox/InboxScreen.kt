@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.TextSnippet
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -385,12 +387,6 @@ fun InboxScreen(
                             item { Spacer(Modifier.height(12.dp)) }
                         }
 
-                        if (otherItems.isNotEmpty()) {
-                            item {
-                                SectionHeader("Recent", count = otherItems.size)
-                            }
-                        }
-
                         items(otherItems, key = { it.id }) { item ->
                             ItemCard(
                                 item = item,
@@ -520,11 +516,18 @@ fun ItemCard(
     ) {
         Box {
             Column(Modifier.padding(12.dp)) {
+                val showLabelChip = !item.label.isNullOrBlank() && item.type != ItemType.IMAGE
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TypeBadge(item.type)
+                    if (showLabelChip) {
+                        AssistChip(
+                            onClick = {},
+                            enabled = false,
+                            label = { Text(item.label!!) }
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
                     Text(
                         relativeTime,
@@ -569,11 +572,6 @@ fun ItemCard(
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                if (!item.label.isNullOrBlank()) {
-                    Spacer(Modifier.height(6.dp))
-                    LabelChip(item.label!!)
-                }
-
                 Spacer(Modifier.height(8.dp))
 
                 if (reminderText != null) {
@@ -589,27 +587,50 @@ fun ItemCard(
                 val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
                 val canCopy = hasTextToCopy || hasImageToCopy
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(onClick = onCopy, enabled = canCopy, label = { Text("Copy") })
-                    AssistChip(onClick = onPin, label = { Text(if (item.pinned) "Unpin" else "Pin") })
-                    AssistChip(onClick = onDelete, label = { Text("Delete") })
-                    AssistChip(onClick = { onLabelClick(item) }, label = { Text("Label") })
-                }
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AssistChip(
-                        onClick = { onReshare(item) },
-                        label = { Text("Re-share") },
-                        leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) }
-                    )
-                    val hasActiveReminder = reminderText != null
-                    AssistChip(
-                        onClick = {
-                            if (hasActiveReminder) onShowReminderDetails(item) else onAddReminder(item)
-                        },
-                        label = { Text(if (hasActiveReminder) "Reminder details" else "Reminder") },
-                        leadingIcon = { Icon(Icons.Filled.Alarm, contentDescription = null) }
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ActionIconButton(
+                            onClick = onCopy,
+                            enabled = canCopy,
+                            icon = Icons.Filled.ContentCopy,
+                            contentDescription = "Copy"
+                        )
+                        ActionIconButton(
+                            onClick = onPin,
+                            icon = Icons.Filled.PushPin,
+                            contentDescription = if (item.pinned) "Unpin" else "Pin",
+                            tint = if (item.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                        ActionIconButton(
+                            onClick = onDelete,
+                            icon = Icons.Filled.Delete,
+                            contentDescription = "Delete"
+                        )
+                        ActionIconButton(
+                            onClick = { onLabelClick(item) },
+                            icon = Icons.Filled.Label,
+                            contentDescription = "Edit label"
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ActionIconButton(
+                            onClick = { onReshare(item) },
+                            icon = Icons.Filled.Share,
+                            contentDescription = "Share"
+                        )
+                        val hasActiveReminder = reminderText != null
+                        ActionIconButton(
+                            onClick = {
+                                if (hasActiveReminder) onShowReminderDetails(item) else onAddReminder(item)
+                            },
+                            icon = Icons.Filled.Alarm,
+                            contentDescription = if (hasActiveReminder) "Reminder details" else "Add reminder"
+                        )
+                    }
                 }
             }
             if (item.pinned) {
@@ -623,6 +644,23 @@ fun ItemCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ActionIconButton(
+    onClick: () -> Unit,
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.onSurface
+) {
+    IconButton(onClick = onClick, enabled = enabled) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -718,31 +756,6 @@ fun ReminderDetailsDialog(item: Item, onDismiss: () -> Unit, onCancelReminder: (
 }
 
 @Composable
-private fun TypeBadge(type: ItemType) {
-    val (icon, label) = when (type) {
-        ItemType.LINK -> Icons.Filled.Link to "Link"
-        ItemType.TEXT -> Icons.Filled.TextSnippet to "Text"
-        ItemType.IMAGE -> Icons.Filled.Image to "Image"
-    }
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null) }
-    )
-}
-
-@Composable
-private fun LabelChip(text: String) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        label = { Text(text) },
-        leadingIcon = { Icon(Icons.Filled.Label, contentDescription = null) }
-    )
-}
-
-@Composable
 private fun SectionHeader(title: String, count: Int) {
     Column(
         modifier = Modifier
@@ -784,7 +797,7 @@ private fun ItemFilter.icon(): ImageVector = when (this) {
 }
 
 private fun ItemSort.label(): String = when (this) {
-    ItemSort.Date -> "Recent"
+    ItemSort.Date -> "Date"
     ItemSort.Name -> "A-Z"
     ItemSort.Label -> "Label"
 }
