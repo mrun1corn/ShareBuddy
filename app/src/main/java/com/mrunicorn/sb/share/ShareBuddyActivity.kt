@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.lifecycleScope
 import com.mrunicorn.sb.App
 import com.mrunicorn.sb.reminder.ReminderScheduler
@@ -26,6 +24,7 @@ import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
 import androidx.compose.foundation.layout.FlowRow
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import com.mrunicorn.sb.ui.components.ReminderDialog
 // Icons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
@@ -267,77 +266,4 @@ class ShareBuddyActivity : ComponentActivity() {
             Toast.makeText(this, "Nothing to share", Toast.LENGTH_SHORT).show()
         }
     }
-}
-
-@Composable
-fun ReminderDialog(onDismiss: () -> Unit, onConfirm: (Long, Boolean) -> Unit) {
-    var inputValue by remember { mutableStateOf("") }
-    var selectedUnit by remember { mutableStateOf(ReminderUnit.HOURS) }
-    var deleteAfterReminder by remember { mutableStateOf(true) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set a reminder") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = inputValue,
-                    onValueChange = { newValue ->
-                        inputValue = newValue.filter { it.isDigit() }
-                    },
-                    label = { Text("Time") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    ReminderUnit.values().forEach { unit ->
-                        FilterChip(
-                            selected = selectedUnit == unit,
-                            onClick = { selectedUnit = unit },
-                            label = { Text(unit.label) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = deleteAfterReminder,
-                        onCheckedChange = { deleteAfterReminder = it }
-                    )
-                    Text("Delete after reminder closes")
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val value = inputValue.toLongOrNull()
-                    if (value != null && value > 0) {
-                        val timeInMillis = when (selectedUnit) {
-                            ReminderUnit.MINUTES -> value * 60 * 1000L
-                            ReminderUnit.HOURS -> value * 60 * 60 * 1000L
-                            ReminderUnit.DAYS -> value * 24 * 60 * 60 * 1000L
-                        }
-                        onConfirm(timeInMillis, deleteAfterReminder)
-                    } else {
-                        // Optionally show an error message
-                    }
-                }
-            ) { Text("Set") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-enum class ReminderUnit(val label: String) {
-    MINUTES("Minutes"),
-    HOURS("Hours"),
-    DAYS("Days")
 }
