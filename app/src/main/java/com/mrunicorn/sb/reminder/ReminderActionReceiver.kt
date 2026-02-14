@@ -8,11 +8,17 @@ import com.mrunicorn.sb.App
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import android.util.Log
 
+@AndroidEntryPoint
 class ReminderActionReceiver : BroadcastReceiver() {
+
     override fun onReceive(context: Context, intent: Intent) {
         val itemId = intent.getStringExtra("itemId") ?: return
-        val repo = (context.applicationContext as App).repo
+        val app = context.applicationContext as App
+        val repo = app.repo
 
         when (intent.action) {
             ACTION_COPY -> {

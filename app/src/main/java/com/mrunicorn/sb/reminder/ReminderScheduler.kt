@@ -8,6 +8,9 @@ import android.content.Intent
 import android.os.Build
 
 
+
+import com.mrunicorn.sb.reminder.ReminderReceiver
+
 object ReminderScheduler {
 fun schedule(
 context: Context,
@@ -30,12 +33,23 @@ itemId.hashCode(),
 intent,
 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 )
-val am = context.getSystemService(AlarmManager::class.java)
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenAt, pi)
-} else {
-am.setExact(AlarmManager.RTC_WAKEUP, whenAt, pi)
-}
+    val am = context.getSystemService(AlarmManager::class.java)
+    val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        am.canScheduleExactAlarms()
+    } else {
+        true
+    }
+
+    if (canScheduleExact) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenAt, pi)
+        } else {
+            am.setExact(AlarmManager.RTC_WAKEUP, whenAt, pi)
+        }
+    } else {
+        // Fallback to non-exact alarm if permission is missing
+        am.set(AlarmManager.RTC_WAKEUP, whenAt, pi)
+    }
 }
 
 

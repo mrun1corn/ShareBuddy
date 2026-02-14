@@ -11,6 +11,8 @@ import com.mrunicorn.sb.data.ItemSort
 import com.mrunicorn.sb.data.ItemType
 import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.reminder.ReminderScheduler
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,14 +32,17 @@ data class InboxUiState(
     val filter: ItemFilter = ItemFilter.All,
     val sortBy: ItemSort = ItemSort.Date,
     val items: List<Item> = emptyList(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val selectedIds: Set<String> = emptySet(),
+    val isSelectionMode: Boolean = false
 )
 
 sealed interface InboxEvent {
     data class Toast(val message: String) : InboxEvent
 }
 
-class InboxViewModel(
+@HiltViewModel
+class InboxViewModel @Inject constructor(
     application: Application,
     private val repository: Repository
 ) : AndroidViewModel(application) {
@@ -45,6 +50,7 @@ class InboxViewModel(
     private val queryFlow = MutableStateFlow("")
     private val filterFlow = MutableStateFlow(ItemFilter.All)
     private val sortFlow = MutableStateFlow(ItemSort.Date)
+    private val selectedIdsFlow = MutableStateFlow<Set<String>>(emptySet())
 
     private val _events = MutableSharedFlow<InboxEvent>(
         extraBufferCapacity = 1,
@@ -62,14 +68,17 @@ class InboxViewModel(
         resultsFlow,
         queryFlow,
         filterFlow,
-        sortFlow
-    ) { items, query, filter, sort ->
+        sortFlow,
+        selectedIdsFlow
+    ) { items, query, filter, sort, selectedIds ->
         InboxUiState(
             query = query,
             filter = filter,
             sortBy = sort,
             items = Repository.sortAndFilter(items, filter, sort),
-            isLoading = false
+            isLoading = false,
+            selectedIds = selectedIds,
+            isSelectionMode = selectedIds.isNotEmpty()
         )
     }.stateIn(
         viewModelScope,
@@ -153,17 +162,38 @@ class InboxViewModel(
             _events.emit(InboxEvent.Toast("Reminder set!"))
         }
     }
-}
 
-class InboxViewModelFactory(
-    private val application: Application,
-    private val repository: Repository
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(InboxViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return InboxViewModel(application, repository) as T
+    fun toggleSelection(itemId: String) {
+        val current = selectedIdsFlow.value
+        if (current.contains(itemId)) {
+            selectedIdsFlow.value = current - itemId
+        } else {
+            selectedIdsFlow.value = current + itemId
         }
-        throw IllegalArgumentException("Unknown ViewModel class ${modelClass.name}")
+    }
+
+    fun clearSelection() {
+        selectedIdsFlow.value = emptySet()
+    }
+
+    fun deleteSelected() {
+        val ids = selectedIdsFlow.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.deleteBulk(ids)
+            clearSelection()
+            _events.emit(InboxEvent.Toast("Deleted ${ids.size} items"))
+        }
+    }
+
+    fun pinSelected(pinned: Boolean) {
+        val ids = selectedIdsFlow.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.pinBulk(ids, pinned)
+            clearSelection()
+            val action = if (pinned) "Pinned" else "Unpinned"
+            _events.emit(InboxEvent.Toast("$action ${ids.size} items"))
+        }
     }
 }

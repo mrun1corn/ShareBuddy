@@ -7,10 +7,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import com.mrunicorn.sb.data.Repository
+
 /**
  * Reschedules existing reminders after device reboot.
  */
+@AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
+    @Inject lateinit var repo: Repository
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             // Reschedule reminders in background
@@ -20,7 +27,8 @@ class BootReceiver : BroadcastReceiver() {
                     val items = app.repo.dao.observeAllOnce() // small helper to get current items snapshot
                     items.filter { it.reminderAt != null && it.reminderAt!! > System.currentTimeMillis() }
                         .forEach { item ->
-                            ReminderScheduler.schedule(context, item.id, item.cleanedText?.take(80) ?: item.text?.take(80) ?: "Reminder", item.reminderAt!!, false, item.label)
+                            val title = item.cleanedText?.take(80) ?: item.text?.take(80) ?: "Reminder"
+                            ReminderScheduler.schedule(context, item.id, title, item.reminderAt!!, false, item.label)
                         }
                 } catch (_: Exception) {
                 }

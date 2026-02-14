@@ -20,8 +20,14 @@ interface ItemDao {
     @Query("DELETE FROM item WHERE id = :id")
     suspend fun delete(id: String)
 
+    @Query("DELETE FROM item WHERE id IN (:ids)")
+    suspend fun deleteBulk(ids: List<String>)
+
     @Query("UPDATE item SET pinned = :pinned WHERE id = :id")
     suspend fun setPinned(id: String, pinned: Boolean)
+
+    @Query("UPDATE item SET pinned = :pinned WHERE id IN (:ids)")
+    suspend fun setPinnedBulk(ids: List<String>, pinned: Boolean)
 
     @Query("SELECT * FROM item WHERE text LIKE '%' || :query || '%' OR cleanedText LIKE '%' || :query || '%' OR label LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun search(query: String): Flow<List<Item>>

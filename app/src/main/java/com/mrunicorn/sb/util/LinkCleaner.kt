@@ -27,4 +27,16 @@ object LinkCleaner {
             url
         }
     }
+
+    fun suggestLabel(url: String): String? {
+        val host = try { Uri.parse(url).host?.lowercase() } catch (_: Exception) { null } ?: return null
+        return when {
+            host.contains("youtube.com") || host.contains("youtu.be") -> "Video"
+            host.contains("github.com") || host.contains("gitlab.com") -> "Dev"
+            host.contains("twitter.com") || host.contains("x.com") || host.contains("reddit.com") -> "Social"
+            host.contains("medium.com") || host.contains("substack.com") -> "Read"
+            host.contains("amazon.") || host.contains("ebay.") -> "Shop"
+            else -> null
+        }
+    }
 }

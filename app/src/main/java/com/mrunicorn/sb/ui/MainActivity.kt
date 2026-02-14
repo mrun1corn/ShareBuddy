@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
-import com.mrunicorn.sb.App
 import com.mrunicorn.sb.ui.inbox.InboxRoute
-import com.mrunicorn.sb.ui.inbox.InboxViewModelFactory
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
+import dagger.hilt.android.AndroidEntryPoint
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
@@ -21,8 +21,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val repo by lazy { (application as App).repo }
 
     private val requestNotif =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
@@ -46,11 +46,8 @@ class MainActivity : ComponentActivity() {
                     controller.isAppearanceLightStatusBars = colorScheme.surface.luminance() > 0.5f
                     WindowCompat.setDecorFitsSystemWindows(window, false)
                 }
-                val viewModel: com.mrunicorn.sb.ui.inbox.InboxViewModel = viewModel(
-                    factory = InboxViewModelFactory(application, repo)
-                )
                 InboxRoute(
-                    viewModel = viewModel,
+                    viewModel = hiltViewModel(),
                     modifier = Modifier.fillMaxSize(),
                     initialScrollItemId = initialItemId
                 )

@@ -7,15 +7,15 @@ import android.os.Build
 import com.mrunicorn.sb.data.AppDb
 import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.reminder.ReminderReceiver
+import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
+@HiltAndroidApp
 class App : Application() {
-    lateinit var repo: Repository
-        private set
+    @Inject lateinit var repo: Repository
 
     override fun onCreate() {
         super.onCreate()
-        // ✅ init Repository with your Room DB/DAO
-        repo = Repository(this, AppDb.get(this).itemDao())
 
         // (optional) reminder channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

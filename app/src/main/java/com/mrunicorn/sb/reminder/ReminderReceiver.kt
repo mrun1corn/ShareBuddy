@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -12,6 +13,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.mrunicorn.sb.R
 import com.mrunicorn.sb.App
 import com.mrunicorn.sb.data.ItemType
+import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +21,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URL
 
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+
+@AndroidEntryPoint
 class ReminderReceiver : BroadcastReceiver() {
+    @Inject lateinit var repo: Repository
+
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -32,13 +40,13 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 when (action) {
                     ACTION_FIRE -> {
-                        val title = intent.getStringExtra(EXTRA_TITLE) ?: "Reminder"
+                        val shortText = intent.getStringExtra(EXTRA_TITLE) ?: "Reminder"
                         val deleteAfter = intent.getBooleanExtra(EXTRA_DELETE_AFTER, false)
                         val itemLabel = intent.getStringExtra(EXTRA_LABEL)
 
                         // Try to load a preview (image item or link thumbnail)
-                        val app = context.applicationContext as App
-                        val item = withContext(Dispatchers.IO) { app.repo.dao.getItemById(itemId) }
+                        val item = withContext(Dispatchers.IO) { repo.dao.getItemById(itemId) }
+                        val fullText = item?.cleanedText ?: item?.text
                         val preview: Bitmap? = when {
                             item != null && item.type == ItemType.IMAGE && item.imageUris.isNotEmpty() ->
                                 loadBitmapFromUri(context, item.imageUris.first(), 512)
@@ -47,7 +55,7 @@ class ReminderReceiver : BroadcastReceiver() {
                             else -> null
                         }
 
-                        showNotification(context, itemId, title, deleteAfter, preview, itemLabel)
+                        showNotification(context, itemId, shortText, fullText, deleteAfter, preview, itemLabel)
                     }
                     ACTION_DONE -> {
                         val app = context.applicationContext as App
@@ -104,7 +112,8 @@ class ReminderReceiver : BroadcastReceiver() {
     private fun showNotification(
         context: Context,
         itemId: String,
-        title: String,
+        shortText: String,
+        fullText: String?,
         deleteAfter: Boolean,
         preview: Bitmap?,
         itemLabel: String?
@@ -121,12 +130,12 @@ class ReminderReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val donePI = PendingIntent.getBroadcast(
+        val sharePI = PendingIntent.getBroadcast(
             context,
             (itemId.hashCode() * 31) + 1,
-            Intent(context, ReminderReceiver::class.java).apply {
-                action = ACTION_DONE
-                putExtra(EXTRA_ITEM_ID, itemId)
+            Intent(context, ReminderActionReceiver::class.java).apply {
+                action = ReminderActionReceiver.ACTION_SHARE
+                putExtra("itemId", itemId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -137,7 +146,7 @@ class ReminderReceiver : BroadcastReceiver() {
             Intent(context, ReminderReceiver::class.java).apply {
                 action = ACTION_SNOOZE
                 putExtra(EXTRA_ITEM_ID, itemId)
-                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_TITLE, shortText)
                 putExtra(EXTRA_DELETE_AFTER, deleteAfter)
                 putExtra(EXTRA_LABEL, itemLabel)
             },
@@ -145,18 +154,14 @@ class ReminderReceiver : BroadcastReceiver() {
         )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_sb) // ✅ small monochrome status icon
-            .setContentTitle(title)
+            .setContentTitle(itemLabel ?: "Share Buddy")
+            .setContentText(shortText)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(contentPI)
-            .addAction(0, "Done", donePI)
+            .addAction(0, "Share", sharePI)
             .addAction(0, "Snooze ${DEFAULT_SNOOZE_MINUTES}m", snoozePI)
-
-        // Only set the secondary line (content text) when the saved label is present.
-        if (!itemLabel.isNullOrBlank()) {
-            builder.setContentText(itemLabel)
-        }
 
         if (deleteAfter) builder.setSubText("Auto-clean suggested")
 
@@ -165,7 +170,7 @@ class ReminderReceiver : BroadcastReceiver() {
             builder.setLargeIcon(preview)
             builder.setStyle(NotificationCompat.BigPictureStyle().bigPicture(preview).bigLargeIcon(null as android.graphics.Bitmap?))
         } else {
-            builder.setStyle(NotificationCompat.BigTextStyle().bigText(title))
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText(fullText ?: shortText))
         }
 
         NotificationManagerCompat.from(context).notify(notificationId(itemId), builder.build())

@@ -3,16 +3,17 @@ plugins {
   id("org.jetbrains.kotlin.android")
   id("org.jetbrains.kotlin.plugin.compose")
   id("com.google.devtools.ksp")
+  id("com.google.dagger.hilt.android")
 }
 
 android {
   namespace = "com.mrunicorn.sb"
-  compileSdk = 34
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.mrunicorn.sb"
     minSdk = 26
-    targetSdk = 34
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
   }
@@ -102,6 +103,16 @@ dependencies {
   // HTML parsing
   implementation("org.jsoup:jsoup:1.17.2")
 
+  // Hilt
+  implementation("com.google.dagger:hilt-android:2.51.1")
+  ksp("com.google.dagger:hilt-android-compiler:2.51.1")
+  implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+  // ML Kit Text Recognition (Play Services version)
+  implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
   // Testing
   testImplementation("junit:junit:4.13.2")
+  testImplementation("org.robolectric:robolectric:4.12.1")
 }

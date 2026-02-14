@@ -10,6 +10,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import com.mrunicorn.sb.util.LinkCleaner
 import com.mrunicorn.sb.util.LinkThumbnailExtractor
+import com.mrunicorn.sb.util.TextExtractor
 import kotlinx.coroutines.flow.Flow
 
 class Repository(private val context: Context, val dao: ItemDao) {
@@ -23,7 +24,10 @@ class Repository(private val context: Context, val dao: ItemDao) {
         val cleaned = if (isLink) LinkCleaner.clean(trimmed) else null
         val type = if (isLink) ItemType.LINK else ItemType.TEXT
         val thumbnailUrl = if (isLink) LinkThumbnailExtractor.extractThumbnailUrl(trimmed) else null
-        val item = Item(type = type, text = trimmed, cleanedText = cleaned, sourcePackage = sourcePkg, thumbnailUrl = thumbnailUrl, label = label)
+        
+        val finalLabel = label ?: if (isLink) LinkCleaner.suggestLabel(trimmed) else null
+
+        val item = Item(type = type, text = trimmed, cleanedText = cleaned, sourcePackage = sourcePkg, thumbnailUrl = thumbnailUrl, label = finalLabel)
         dao.upsert(item)
         return item
     }
@@ -86,9 +90,14 @@ class Repository(private val context: Context, val dao: ItemDao) {
                 src
             }
         }
+ 
+        val ocrText = if (imageUrisToSave.isNotEmpty()) {
+            TextExtractor.extractText(context, imageUrisToSave.first())
+        } else null
 
         val item = Item(
             type = ItemType.IMAGE,
+            text = ocrText,
             imageUris = imageUrisToSave,
             sourcePackage = sourcePkg,
             label = label
@@ -98,7 +107,10 @@ class Repository(private val context: Context, val dao: ItemDao) {
     }
 
     suspend fun delete(id: String) = dao.delete(id)
+    suspend fun deleteBulk(ids: List<String>) = dao.deleteBulk(ids)
+
     suspend fun pin(id: String, pinned: Boolean) = dao.setPinned(id, pinned)
+    suspend fun pinBulk(ids: List<String>, pinned: Boolean) = dao.setPinnedBulk(ids, pinned)
 
     suspend fun updateLabel(id: String, label: String?) {
         val item = dao.getItemById(id)

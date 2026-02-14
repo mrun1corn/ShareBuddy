@@ -11,11 +11,14 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +51,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -141,6 +145,13 @@ fun InboxRoute(
         }
     }
 
+    // Back handling to clear selection
+    if (state.isSelectionMode) {
+        androidx.activity.compose.BackHandler {
+            viewModel.clearSelection()
+        }
+    }
+
     InboxScreen(
         state = state,
         lazyListState = lazyListState,
@@ -157,6 +168,10 @@ fun InboxRoute(
         onReshare = viewModel::reshare,
         onReminderDetailsRequested = { reminderDetailsItem = it },
         onReminderScheduleRequested = { reminderTarget = it },
+        onToggleSelection = viewModel::toggleSelection,
+        onClearSelection = viewModel::clearSelection,
+        onDeleteSelected = viewModel::deleteSelected,
+        onPinSelected = viewModel::pinSelected,
         modifier = modifier
     )
 
@@ -222,6 +237,10 @@ fun InboxScreen(
     onReshare: (Item) -> Unit,
     onReminderDetailsRequested: (Item) -> Unit,
     onReminderScheduleRequested: (Item) -> Unit,
+    onToggleSelection: (String) -> Unit,
+    onClearSelection: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onPinSelected: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
@@ -232,60 +251,79 @@ fun InboxScreen(
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = {
-                    if (showSearch) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(26.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            tonalElevation = 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+            if (state.isSelectionMode) {
+                TopAppBar(
+                    title = { Text("${state.selectedIds.size} selected") },
+                    navigationIcon = {
+                        IconButton(onClick = onClearSelection) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear selection")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { onPinSelected(true) }) {
+                            Icon(Icons.Filled.PushPin, contentDescription = "Pin selected")
+                        }
+                        IconButton(onClick = onDeleteSelected) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete selected")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        if (showSearch) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(26.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                tonalElevation = 2.dp
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Search,
-                                    contentDescription = "Search",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Box(Modifier.weight(1f)) {
-                                    if (state.query.isBlank()) {
-                                        Text(
-                                            "Search",
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                    BasicTextField(
-                                        value = state.query,
-                                        onValueChange = onQueryChange,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = "Search",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                }
-                                IconButton(onClick = {
-                                    if (state.query.isNotBlank()) {
-                                        onQueryChange("")
-                                    } else {
-                                        showSearch = false
+                                    Spacer(Modifier.width(8.dp))
+                                    Box(Modifier.weight(1f)) {
+                                        if (state.query.isBlank()) {
+                                            Text(
+                                                "Search",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                        BasicTextField(
+                                            value = state.query,
+                                            onValueChange = onQueryChange,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        )
                                     }
-                                }) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Close search")
+                                    IconButton(onClick = {
+                                        if (state.query.isNotBlank()) {
+                                            onQueryChange("")
+                                        } else {
+                                            showSearch = false
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Close search")
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        } else {
                             Column {
                                 Text("Share Buddy", style = MaterialTheme.typography.titleLarge)
                                 val subtitle = buildString {
@@ -301,49 +339,51 @@ fun InboxScreen(
                                 )
                             }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        onQueryChange("")
-                        onFilterSelected(ItemFilter.All)
-                        onSortSelected(ItemSort.Date)
-                    }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Reset filters")
-                    }
-                    IconButton(onClick = { showSearch = !showSearch }) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
-                    }
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Filled.Sort, contentDescription = "Change sort order")
-                    }
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false }
-                    ) {
-                        ItemSort.values().forEach { sort ->
-                            DropdownMenuItem(
-                                text = { Text(sort.label()) },
-                                onClick = {
-                                    onSortSelected(sort)
-                                    showSortMenu = false
-                                }
-                            )
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            onQueryChange("")
+                            onFilterSelected(ItemFilter.All)
+                            onSortSelected(ItemSort.Date)
+                        }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Reset filters")
                         }
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
+                        IconButton(onClick = { showSearch = !showSearch }) {
+                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                        }
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(Icons.Filled.Sort, contentDescription = "Change sort order")
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            ItemSort.values().forEach { sort ->
+                                DropdownMenuItem(
+                                    text = { Text(sort.label()) },
+                                    onClick = {
+                                        onSortSelected(sort)
+                                        showSortMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
         bottomBar = {
-            NavigationBar {
-                ItemFilter.values().forEach { filter ->
-                    NavigationBarItem(
-                        selected = state.filter == filter,
-                        onClick = { onFilterSelected(filter) },
-                        icon = { Icon(filter.icon(), contentDescription = filter.label()) },
-                        label = { Text(filter.label()) }
-                    )
+            if (!state.isSelectionMode) {
+                NavigationBar {
+                    ItemFilter.values().forEach { filter ->
+                        NavigationBarItem(
+                            selected = state.filter == filter,
+                            onClick = { onFilterSelected(filter) },
+                            icon = { Icon(filter.icon(), contentDescription = filter.label()) },
+                            label = { Text(filter.label()) }
+                        )
+                    }
                 }
             }
         }
@@ -384,7 +424,10 @@ fun InboxScreen(
                                     onLabelClick = onLabelRequested,
                                     onReshare = { onReshare(item) },
                                     onShowReminderDetails = onReminderDetailsRequested,
-                                    onAddReminder = onReminderScheduleRequested
+                                    onAddReminder = onReminderScheduleRequested,
+                                    isSelected = state.selectedIds.contains(item.id),
+                                    isSelectionMode = state.isSelectionMode,
+                                    onToggleSelection = { onToggleSelection(item.id) }
                                 )
                             }
                             item { Spacer(Modifier.height(12.dp)) }
@@ -400,7 +443,10 @@ fun InboxScreen(
                                 onLabelClick = onLabelRequested,
                                 onReshare = { onReshare(item) },
                                 onShowReminderDetails = onReminderDetailsRequested,
-                                onAddReminder = onReminderScheduleRequested
+                                onAddReminder = onReminderScheduleRequested,
+                                isSelected = state.selectedIds.contains(item.id),
+                                isSelectionMode = state.isSelectionMode,
+                                onToggleSelection = { onToggleSelection(item.id) }
                             )
                         }
                     }
@@ -483,7 +529,7 @@ private fun ImagePreviewOverlay(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ItemCard(
     item: Item,
@@ -494,10 +540,16 @@ fun ItemCard(
     onLabelClick: (Item) -> Unit,
     onReshare: (Item) -> Unit,
     onShowReminderDetails: (Item) -> Unit,
-    onAddReminder: (Item) -> Unit
+    onAddReminder: (Item) -> Unit,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
+    onToggleSelection: () -> Unit
 ) {
-    val containerColor =
-        if (item.pinned) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+    val containerColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        item.pinned -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surface
+    }
     val relativeTime = remember(item.createdAt) {
         DateUtils.getRelativeTimeSpanString(
             item.createdAt,
@@ -514,22 +566,46 @@ fun ItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
+            .combinedClickable(
+                onClick = {
+                    if (isSelectionMode) onToggleSelection()
+                    else if (item.type == ItemType.LINK) {
+                        /* Already handled by text click but box click can open it too if desired */
+                    }
+                },
+                onLongClick = { onToggleSelection() }
+            ),
         colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Box {
             Column(Modifier.padding(12.dp)) {
-                val showLabelChip = !item.label.isNullOrBlank() && item.type != ItemType.IMAGE
+                if (isSelectionMode) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (isSelected) "Selected" else "Select", style = MaterialTheme.typography.labelMedium)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                val label = item.label
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (showLabelChip) {
-                        AssistChip(
-                            onClick = {},
-                            enabled = false,
-                            label = { Text(item.label!!) }
-                        )
+                    if (!label.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Text(
+                                text = label.uppercase(),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                     Spacer(Modifier.weight(1f))
                     Text(

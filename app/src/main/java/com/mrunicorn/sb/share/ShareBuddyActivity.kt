@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.lifecycleScope
 import com.mrunicorn.sb.App
+import com.mrunicorn.sb.data.Repository
 import com.mrunicorn.sb.reminder.ReminderScheduler
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
@@ -31,15 +32,21 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Link
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @OptIn(ExperimentalLayoutApi::class)
+@AndroidEntryPoint
 class ShareBuddyActivity : ComponentActivity() {
     private val requestNotif = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             showReminderDialog = true
         }
     }
-    private val repo by lazy { (application as App).repo }
+    
+    @Inject
+    lateinit var repo: Repository
+
     private var sharedText: String? = null
     private var sharedImages: List<Uri> = emptyList()
     private var showReminderDialog by mutableStateOf(false)
