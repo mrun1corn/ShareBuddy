@@ -13,18 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -33,60 +25,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.TextSnippet
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.mrunicorn.sb.R
 import com.mrunicorn.sb.data.Item
 import com.mrunicorn.sb.data.ItemFilter
 import com.mrunicorn.sb.data.ItemSort
@@ -114,25 +74,14 @@ fun InboxRoute(
     var reminderTarget by remember { mutableStateOf<Item?>(null) }
 
     var pendingScrollItemId by rememberSaveable { mutableStateOf(initialScrollItemId) }
-    val pinnedItems = remember(state.items) { state.items.filter { it.pinned } }
-    val otherItems = remember(state.items) { state.items.filterNot { it.pinned } }
+    
     LaunchedEffect(state.items, pendingScrollItemId) {
         val target = pendingScrollItemId ?: return@LaunchedEffect
-        val pinnedIndex = pinnedItems.indexOfFirst { it.id == target }
-        if (pinnedIndex >= 0) {
-            val headerOffset = 1 // pinned section header
-            lazyListState.animateScrollToItem(headerOffset + pinnedIndex)
-            pendingScrollItemId = null
-            return@LaunchedEffect
-        }
-        val regularIndex = otherItems.indexOfFirst { it.id == target }
-        if (regularIndex >= 0) {
-            var offset = 0
-            if (pinnedItems.isNotEmpty()) {
-                offset += 1 + pinnedItems.size + 1 // header + pinned + spacer
-            }
-            offset += 1 // recent header
-            lazyListState.animateScrollToItem(offset + regularIndex)
+        val index = state.items.indexOfFirst { it.id == target }
+        if (index >= 0) {
+            // Simple approach: scroll to the item index directly
+            // In a real app with headers, we'd need more logic
+            lazyListState.animateScrollToItem(index)
             pendingScrollItemId = null
         }
     }
@@ -145,7 +94,6 @@ fun InboxRoute(
         }
     }
 
-    // Back handling to clear selection
     if (state.isSelectionMode) {
         androidx.activity.compose.BackHandler {
             viewModel.clearSelection()
@@ -253,18 +201,18 @@ fun InboxScreen(
         topBar = {
             if (state.isSelectionMode) {
                 TopAppBar(
-                    title = { Text("${state.selectedIds.size} selected") },
+                    title = { Text(stringResource(id = R.string.app_name)) }, // Fallback title
                     navigationIcon = {
                         IconButton(onClick = onClearSelection) {
-                            Icon(Icons.Filled.Close, contentDescription = "Clear selection")
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(id = R.string.close))
                         }
                     },
                     actions = {
                         IconButton(onClick = { onPinSelected(true) }) {
-                            Icon(Icons.Filled.PushPin, contentDescription = "Pin selected")
+                            Icon(Icons.Filled.PushPin, contentDescription = "Pin")
                         }
                         IconButton(onClick = onDeleteSelected) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete selected")
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(id = R.string.delete))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -279,8 +227,7 @@ fun InboxScreen(
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(26.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                tonalElevation = 2.dp
+                                color = MaterialTheme.colorScheme.surfaceVariant
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -290,14 +237,14 @@ fun InboxScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Search,
-                                        contentDescription = "Search",
+                                        contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Box(Modifier.weight(1f)) {
                                         if (state.query.isBlank()) {
                                             Text(
-                                                "Search",
+                                                stringResource(id = R.string.search_hint),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
@@ -319,19 +266,14 @@ fun InboxScreen(
                                             showSearch = false
                                         }
                                     }) {
-                                        Icon(Icons.Filled.Close, contentDescription = "Close search")
+                                        Icon(Icons.Filled.Close, contentDescription = null)
                                     }
                                 }
                             }
                         } else {
                             Column {
-                                Text("Share Buddy", style = MaterialTheme.typography.titleLarge)
-                                val subtitle = buildString {
-                                    append("${state.items.size} saved")
-                                    if (state.filter != ItemFilter.All) {
-                                        append(" • ${state.filter.label()}")
-                                    }
-                                }
+                                Text(stringResource(id = R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                                val subtitle = stringResource(id = R.string.saved_count, state.items.size)
                                 Text(
                                     subtitle,
                                     style = MaterialTheme.typography.labelMedium,
@@ -346,13 +288,13 @@ fun InboxScreen(
                             onFilterSelected(ItemFilter.All)
                             onSortSelected(ItemSort.Date)
                         }) {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Reset filters")
+                            Icon(Icons.Filled.Refresh, contentDescription = stringResource(id = R.string.reset_filters))
                         }
                         IconButton(onClick = { showSearch = !showSearch }) {
-                            Icon(Icons.Filled.Search, contentDescription = "Search")
+                            Icon(Icons.Filled.Search, contentDescription = stringResource(id = R.string.search_hint))
                         }
                         IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.Filled.Sort, contentDescription = "Change sort order")
+                            Icon(Icons.Filled.Sort, contentDescription = stringResource(id = R.string.change_sort_order))
                         }
                         DropdownMenu(
                             expanded = showSortMenu,
@@ -360,7 +302,7 @@ fun InboxScreen(
                         ) {
                             ItemSort.values().forEach { sort ->
                                 DropdownMenuItem(
-                                    text = { Text(sort.label()) },
+                                    text = { Text(sort.name) },
                                     onClick = {
                                         onSortSelected(sort)
                                         showSortMenu = false
@@ -380,8 +322,8 @@ fun InboxScreen(
                         NavigationBarItem(
                             selected = state.filter == filter,
                             onClick = { onFilterSelected(filter) },
-                            icon = { Icon(filter.icon(), contentDescription = filter.label()) },
-                            label = { Text(filter.label()) }
+                            icon = { Icon(filter.icon(), contentDescription = filter.name) },
+                            label = { Text(filter.name) }
                         )
                     }
                 }
@@ -396,44 +338,18 @@ fun InboxScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
                     .blur(baseBlur)
             ) {
-                Spacer(Modifier.height(12.dp))
-
                 if (state.items.isEmpty() && !state.isLoading) {
                     EmptyInboxState(filter = state.filter, query = state.query)
                 } else {
-                    val pinnedItems = state.items.filter { it.pinned }
-                    val otherItems = state.items.filterNot { it.pinned }
                     LazyColumn(
                         state = lazyListState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        if (pinnedItems.isNotEmpty()) {
-                            item {
-                                SectionHeader("Pinned", count = pinnedItems.size)
-                            }
-                            items(pinnedItems, key = { it.id }) { item ->
-                                ItemCard(
-                                    item = item,
-                                    onCopy = { onCopy(item) },
-                                    onImageClick = onImageSelected,
-                                    onPin = { onPinToggle(item) },
-                                    onDelete = { onDeleteRequested(item) },
-                                    onLabelClick = onLabelRequested,
-                                    onReshare = { onReshare(item) },
-                                    onShowReminderDetails = onReminderDetailsRequested,
-                                    onAddReminder = onReminderScheduleRequested,
-                                    isSelected = state.selectedIds.contains(item.id),
-                                    isSelectionMode = state.isSelectionMode,
-                                    onToggleSelection = { onToggleSelection(item.id) }
-                                )
-                            }
-                            item { Spacer(Modifier.height(12.dp)) }
-                        }
-
-                        items(otherItems, key = { it.id }) { item ->
+                        items(state.items, key = { it.id }) { item ->
                             ItemCard(
                                 item = item,
                                 onCopy = { onCopy(item) },
@@ -473,17 +389,16 @@ private fun EmptyInboxState(filter: ItemFilter, query: String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = Icons.Filled.Inbox,
-                contentDescription = "Empty inbox icon",
+                contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
             Spacer(Modifier.height(16.dp))
             val message = when {
-                query.isNotBlank() -> "No matches for \"$query\""
-                filter != ItemFilter.All -> "No ${filter.label()} items yet"
-                else -> "No items yet — Share to Share Buddy from any app."
+                query.isNotBlank() -> stringResource(id = R.string.no_matches, query)
+                else -> stringResource(id = R.string.no_items_yet)
             }
-            Text(message)
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -493,43 +408,52 @@ private fun ImagePreviewOverlay(
     uri: Uri?,
     onDismiss: () -> Unit
 ) {
-    Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f))
-                .clickable { onDismiss() }
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = uri,
-                contentDescription = "Preview image",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp),
-                contentScale = ContentScale.Fit
-            )
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close preview",
-                    tint = Color.White
-                )
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+        scale = (scale * zoomChange).coerceIn(1f, 5f)
+        offset += offsetChange
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onDismiss() })
             }
+    ) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offset.x,
+                    translationY = offset.y
+                )
+                .transformable(state = state),
+            contentScale = ContentScale.Fit
+        )
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Close,
+                contentDescription = stringResource(id = R.string.close),
+                tint = Color.White
+            )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ItemCard(
     item: Item,
@@ -570,40 +494,35 @@ fun ItemCard(
             .combinedClickable(
                 onClick = {
                     if (isSelectionMode) onToggleSelection()
-                    else if (item.type == ItemType.LINK) {
-                        /* Already handled by text click but box click can open it too if desired */
-                    }
                 },
                 onLongClick = { onToggleSelection() }
             ),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Box {
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(16.dp)) {
                 if (isSelectionMode) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
                         Spacer(Modifier.width(8.dp))
-                        Text(if (isSelected) "Selected" else "Select", style = MaterialTheme.typography.labelMedium)
+                        Text("Selected", style = MaterialTheme.typography.labelMedium)
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                val label = item.label
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (!label.isNullOrBlank()) {
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    item.label?.let { label ->
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
+                            color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
                             Text(
                                 text = label.uppercase(),
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSecondary
                             )
                         }
                     }
@@ -619,32 +538,31 @@ fun ItemCard(
                 if (item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()) {
                     AsyncImage(
                         model = item.imageUris.first(),
-                        contentDescription = "Shared image",
+                        contentDescription = null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(120.dp)
-                            .clickable { onImageClick(item.imageUris.first()) },
+                            .height(180.dp)
+                            .clickable { onImageClick(item.imageUris.first()) }
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.height(8.dp))
                 } else if (item.type == ItemType.LINK && !item.thumbnailUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = item.thumbnailUrl,
-                        contentDescription = "Link thumbnail",
+                        contentDescription = null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp),
+                            .height(180.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.height(8.dp))
                 }
 
-                val title = when (item.type) {
-                    ItemType.LINK -> item.cleanedText ?: item.text ?: "(link)"
-                    ItemType.TEXT -> item.text ?: "(text)"
-                    ItemType.IMAGE -> item.label ?: "Image"
-                }
+                val title = item.cleanedText ?: item.text ?: ""
                 val context = LocalContext.current
+                
                 if (item.type == ItemType.LINK && title.isNotBlank()) {
                     Text(
                         title,
@@ -653,40 +571,37 @@ fun ItemCard(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.clickable {
-                            val target = Uri.parse(item.cleanedText ?: item.text)
-                            val intent = Intent(Intent.ACTION_VIEW, target).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            try {
-                                context.startActivity(intent)
-                            } catch (e: ActivityNotFoundException) {
-                                Toast.makeText(context, "No app to open link", Toast.LENGTH_SHORT).show()
-                            }
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(title)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            try { context.startActivity(intent) } catch (_: Exception) {}
                         }
                     )
+                } else if (item.type == ItemType.IMAGE && title.isBlank()) {
+                   Row(verticalAlignment = Alignment.CenterVertically) {
+                       CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                       Spacer(Modifier.width(8.dp))
+                       Text("Processing text...", style = MaterialTheme.typography.bodySmall)
+                   }
                 } else {
                     SelectionContainer {
                         Text(
                             title,
-                            maxLines = 3,
+                            maxLines = 5,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
 
                 if (reminderText != null) {
                     AssistChip(
                         onClick = { onShowReminderDetails(item) },
                         label = { Text(reminderText) },
-                        leadingIcon = { Icon(Icons.Filled.Alarm, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Filled.Alarm, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Spacer(Modifier.height(8.dp))
                 }
-
-                val hasTextToCopy = !((item.cleanedText ?: item.text).isNullOrBlank())
-                val hasImageToCopy = item.type == ItemType.IMAGE && item.imageUris.isNotEmpty()
-                val canCopy = hasTextToCopy || hasImageToCopy
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -694,54 +609,41 @@ fun ItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ActionIconButton(
-                            onClick = onCopy,
-                            enabled = canCopy,
-                            icon = Icons.Filled.ContentCopy,
-                            contentDescription = "Copy"
-                        )
-                        ActionIconButton(
-                            onClick = onPin,
-                            icon = Icons.Filled.PushPin,
-                            contentDescription = if (item.pinned) "Unpin" else "Pin",
-                            tint = if (item.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                        ActionIconButton(
-                            onClick = onDelete,
-                            icon = Icons.Filled.Delete,
-                            contentDescription = "Delete"
-                        )
-                        ActionIconButton(
-                            onClick = { onLabelClick(item) },
-                            icon = Icons.Filled.Label,
-                            contentDescription = "Edit label"
-                        )
+                        IconButton(onClick = onCopy) {
+                            Icon(Icons.Filled.ContentCopy, contentDescription = stringResource(id = R.string.save))
+                        }
+                        IconButton(onClick = onPin) {
+                            Icon(
+                                Icons.Filled.PushPin,
+                                contentDescription = null,
+                                tint = if (item.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(id = R.string.delete))
+                        }
+                        IconButton(onClick = { onLabelClick(item) }) {
+                            Icon(Icons.Filled.Label, contentDescription = null)
+                        }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        ActionIconButton(
-                            onClick = { onReshare(item) },
-                            icon = Icons.Filled.Share,
-                            contentDescription = "Share"
-                        )
-                        val hasActiveReminder = reminderText != null
-                        ActionIconButton(
-                            onClick = {
-                                if (hasActiveReminder) onShowReminderDetails(item) else onAddReminder(item)
-                            },
-                            icon = Icons.Filled.Alarm,
-                            contentDescription = if (hasActiveReminder) "Reminder details" else "Add reminder"
-                        )
+                        IconButton(onClick = { onReshare(item) }) {
+                            Icon(Icons.Filled.Share, contentDescription = stringResource(id = R.string.reshare))
+                        }
+                        IconButton(onClick = { 
+                            if (reminderText != null) onShowReminderDetails(item) else onAddReminder(item)
+                        }) {
+                            Icon(Icons.Filled.Alarm, contentDescription = stringResource(id = R.string.remind))
+                        }
                     }
                 }
             }
             if (item.pinned) {
                 Icon(
                     imageVector = Icons.Filled.PushPin,
-                    contentDescription = "Pinned",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
                 )
             }
         }
@@ -749,42 +651,25 @@ fun ItemCard(
 }
 
 @Composable
-private fun ActionIconButton(
-    onClick: () -> Unit,
-    icon: ImageVector,
-    contentDescription: String,
-    enabled: Boolean = true,
-    tint: Color = MaterialTheme.colorScheme.onSurface
-) {
-    IconButton(onClick = onClick, enabled = enabled) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
 fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) -> Unit) {
     var labelText by remember { mutableStateOf(item.label ?: "") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Label") },
+        title = { Text(stringResource(id = R.string.edit_label)) },
         text = {
             OutlinedTextField(
                 value = labelText,
                 onValueChange = { labelText = it },
-                label = { Text("Label") },
-                singleLine = true
+                label = { Text(stringResource(id = R.string.label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(item, labelText.ifBlank { null }) }) { Text("Save") }
+            TextButton(onClick = { onConfirm(item, labelText.ifBlank { null }) }) { Text(stringResource(id = R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.cancel)) }
         }
     )
 }
@@ -793,112 +678,50 @@ fun LabelDialog(item: Item, onDismiss: () -> Unit, onConfirm: (Item, String?) ->
 private fun ConfirmDeleteDialog(onDismiss: () -> Unit, onConfirm: (Item) -> Unit, item: Item) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete item?") },
-        text = { Text("Are you sure you want to delete this item? This action can't be undone.") },
+        title = { Text(stringResource(id = R.string.delete_item_q)) },
+        text = { Text(stringResource(id = R.string.delete_confirm_msg)) },
         confirmButton = {
-            TextButton(onClick = { onConfirm(item) }) { Text("Delete") }
+            TextButton(onClick = { onConfirm(item) }) { Text(stringResource(id = R.string.delete), color = MaterialTheme.colorScheme.error) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.cancel)) }
         }
     )
 }
 
 @Composable
 fun ReminderDetailsDialog(item: Item, onDismiss: () -> Unit, onCancelReminder: (Item) -> Unit) {
-    val remainingTime = remember(item.reminderAt) {
-        val reminderAt = item.reminderAt ?: return@remember "No reminder set"
-        val diff = reminderAt - System.currentTimeMillis()
-        if (diff <= 0) {
-            "Reminder overdue"
-        } else {
-            val minutes = diff / (1000 * 60)
-            val hours = minutes / 60
-            val days = hours / 24
-            when {
-                days > 0 -> "${days}d ${hours % 24}h remaining"
-                hours > 0 -> "${hours}h ${minutes % 60}m remaining"
-                minutes > 0 -> "${minutes}m remaining"
-                else -> "Less than a minute remaining"
-            }
-        }
-    }
-
-    val reminderTime = remember(item.reminderAt) {
-        item.reminderAt?.let {
-            SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(it))
-        }
-    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Reminder Details") },
+        title = { Text(stringResource(id = R.string.reminder_details)) },
         text = {
             Column {
                 val displayText = item.text ?: item.cleanedText
                 if (!displayText.isNullOrBlank()) {
-                    Text("Item: $displayText")
+                    Text(displayText, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(8.dp))
                 }
-                reminderTime?.let {
-                    Text("Time: $it")
-                    Spacer(Modifier.height(8.dp))
+                item.reminderAt?.let {
+                    val time = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(it))
+                    Text("Time: $time")
+                    if (item.deleteAfterReminder) {
+                        Text("Action: Delete after reminder", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    }
                 }
-                Text("Remaining: $remainingTime")
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCancelReminder(item) }) { Text("Cancel Reminder") }
+            TextButton(onClick = { onCancelReminder(item) }) { Text(stringResource(id = R.string.cancel_reminder)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.close)) }
         }
     )
-}
-
-@Composable
-private fun SectionHeader(title: String, count: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                title.uppercase(),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                "$count",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Divider(modifier = Modifier.padding(top = 4.dp))
-    }
-}
-
-private fun ItemFilter.label(): String = when (this) {
-    ItemFilter.All -> "All"
-    ItemFilter.Links -> "Links"
-    ItemFilter.Text -> "Text"
-    ItemFilter.Images -> "Images"
 }
 
 private fun ItemFilter.icon(): ImageVector = when (this) {
     ItemFilter.All -> Icons.Filled.Inbox
     ItemFilter.Links -> Icons.Filled.Link
-    ItemFilter.Text -> Icons.Filled.TextSnippet
+    ItemFilter.Text -> Icons.Filled.Description
     ItemFilter.Images -> Icons.Filled.Image
-}
-
-private fun ItemSort.label(): String = when (this) {
-    ItemSort.Date -> "Date"
-    ItemSort.Name -> "A-Z"
-    ItemSort.Label -> "Label"
 }

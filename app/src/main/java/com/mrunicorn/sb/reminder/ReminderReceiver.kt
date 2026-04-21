@@ -74,7 +74,7 @@ class ReminderReceiver : BroadcastReceiver() {
                         val app = context.applicationContext as App
                         withContext(Dispatchers.IO) {
                             try {
-                                app.repo.setReminder(itemId, inTen)
+                                app.repo.setReminder(itemId, inTen, deleteAfter)
                                 // Read back to verify persistence
                                 // read-back intentionally omitted from release build
                             } catch (_: Exception) {

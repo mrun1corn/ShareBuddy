@@ -1,4 +1,13 @@
 <resources>
     <!-- App theme based on Material 3 -->
     <style name="Theme.ShareBuddy" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <style name="Theme.ShareBuddy.Transparent" parent="Theme.ShareBuddy">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
 </resources>

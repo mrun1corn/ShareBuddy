@@ -74,7 +74,7 @@ test-results/
 .android/avd/
 
 # Gradle wrapper
-gradle-wrapper.jar
+# gradle-wrapper.jar
 
 # Kotlin
 .kotlin/

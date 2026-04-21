@@ -29,13 +29,21 @@ interface ItemDao {
     @Query("UPDATE item SET pinned = :pinned WHERE id IN (:ids)")
     suspend fun setPinnedBulk(ids: List<String>, pinned: Boolean)
 
-    @Query("SELECT * FROM item WHERE text LIKE '%' || :query || '%' OR cleanedText LIKE '%' || :query || '%' OR label LIKE '%' || :query || '%' ORDER BY createdAt DESC")
-    fun search(query: String): Flow<List<Item>>
+    @Query("""
+        SELECT * FROM item 
+        WHERE (:filterType IS NULL OR type = :filterType)
+        AND (:query IS NULL OR text LIKE '%' || :query || '%' OR cleanedText LIKE '%' || :query || '%' OR label LIKE '%' || :query || '%')
+        ORDER BY 
+            CASE WHEN :sortBy = 'Date' THEN createdAt END DESC,
+            CASE WHEN :sortBy = 'Name' THEN text END ASC,
+            CASE WHEN :sortBy = 'Label' THEN label END ASC
+    """)
+    fun observeFiltered(query: String?, filterType: ItemType?, sortBy: String): Flow<List<Item>>
 
-    @Query("UPDATE item SET reminderAt = :reminderAt WHERE id = :id")
-    suspend fun setReminder(id: String, reminderAt: Long?)
+    @Query("UPDATE item SET reminderAt = :reminderAt, deleteAfterReminder = :deleteAfter WHERE id = :id")
+    suspend fun setReminder(id: String, reminderAt: Long?, deleteAfter: Boolean)
 
     // One-shot read for background tasks (not a Flow)
-    @Query("SELECT * FROM item ORDER BY createdAt DESC")
-    suspend fun observeAllOnce(): List<Item>
+    @Query("SELECT * FROM item WHERE reminderAt IS NOT NULL AND reminderAt > :now")
+    suspend fun getPendingReminders(now: Long): List<Item>
 }

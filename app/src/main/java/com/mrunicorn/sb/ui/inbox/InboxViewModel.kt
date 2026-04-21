@@ -58,11 +58,17 @@ class InboxViewModel @Inject constructor(
     )
     val events = _events.asSharedFlow()
 
-    private val resultsFlow = queryFlow
-        .debounce(200)
-        .map { it.trim() }
-        .distinctUntilChanged()
-        .flatMapLatest { repository.inbox(it.ifBlank { null }) }
+    private val resultsFlow = combine(
+        queryFlow.debounce(200),
+        filterFlow,
+        sortFlow
+    ) { query, filter, sort ->
+        Triple(query, filter, sort)
+    }
+    .distinctUntilChanged()
+    .flatMapLatest { (query, filter, sort) ->
+        repository.inbox(query, filter, sort)
+    }
 
     val state: StateFlow<InboxUiState> = combine(
         resultsFlow,
@@ -75,7 +81,7 @@ class InboxViewModel @Inject constructor(
             query = query,
             filter = filter,
             sortBy = sort,
-            items = Repository.sortAndFilter(items, filter, sort),
+            items = items,
             isLoading = false,
             selectedIds = selectedIds,
             isSelectionMode = selectedIds.isNotEmpty()
@@ -150,7 +156,7 @@ class InboxViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val whenAt = now + millisFromNow
             val title = item.cleanedText?.take(80) ?: item.text?.take(80) ?: "Reminder"
-            repository.setReminder(item.id, whenAt)
+            repository.setReminder(item.id, whenAt, deleteAfterReminder)
             ReminderScheduler.schedule(
                 getApplication(),
                 itemId = item.id,

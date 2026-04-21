@@ -20,6 +20,7 @@ data class Item(
     val createdAt: Long = System.currentTimeMillis(),
     val pinned: Boolean = false,
     val reminderAt: Long? = null,
+    val deleteAfterReminder: Boolean = false,
     val label: String? = null
 )
 

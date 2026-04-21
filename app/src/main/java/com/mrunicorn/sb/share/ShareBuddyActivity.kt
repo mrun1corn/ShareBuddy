@@ -10,6 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,184 +19,192 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import androidx.lifecycle.lifecycleScope
-import com.mrunicorn.sb.App
-import com.mrunicorn.sb.data.Repository
+import androidx.activity.viewModels
 import com.mrunicorn.sb.reminder.ReminderScheduler
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.mrunicorn.sb.ui.theme.ShareBuddyTheme
-import androidx.compose.foundation.layout.FlowRow
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import com.mrunicorn.sb.ui.components.ReminderDialog
-// Icons
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Link
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @AndroidEntryPoint
 class ShareBuddyActivity : ComponentActivity() {
+    private val viewModel: ShareViewModel by viewModels()
+
     private val requestNotif = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             showReminderDialog = true
         }
     }
     
-    @Inject
-    lateinit var repo: Repository
-
-    private var sharedText: String? = null
-    private var sharedImages: List<Uri> = emptyList()
     private var showReminderDialog by mutableStateOf(false)
-    private var labelText by mutableStateOf("")
-    private var lastSavedItemId: String? = null
-
-    // ✅ Prevent duplicate saves (debounce)
-    private var isSaving by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        parseShare(intent)
+        viewModel.parseIntent(intent)
+
         setContent {
             ShareBuddyTheme {
-                Surface {
-                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Filled.Share, contentDescription = "App icon")
-                        Spacer(Modifier.width(8.dp))
-                        Text("Share Buddy", style = MaterialTheme.typography.headlineSmall)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        if (sharedImages.isNotEmpty()) {
-                            Column {
-                                for (uri in sharedImages) {
-                                    AsyncImage(
-                                        model = uri,
-                                        contentDescription = "Shared image",
-                                        modifier = Modifier.fillMaxWidth().height(200.dp)
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                }
-                            }
-                        } else {
-                            val preview = sharedText ?: ""
-                            Text(preview, maxLines = 6, overflow = TextOverflow.Ellipsis)
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        OutlinedTextField(
-                            value = labelText,
-                            onValueChange = { labelText = it },
-                            label = { Text("Label (optional)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                var showSheet by remember { mutableStateOf(true) }
+                val sheetState = rememberModalBottomSheetState()
+
+                if (showSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { 
+                            showSheet = false
+                            finish() 
+                        },
+                        sheetState = sheetState,
+                        dragHandle = { BottomSheetDefaults.DragHandle() }
+                    ) {
+                        ShareSheetContent(
+                            viewModel = viewModel,
+                            onSave = { onSave() },
+                            onCleanAndReshare = { onCleanAndReshare() },
+                            onRemind = { onRemind() },
+                            onReshare = { onReshare() }
                         )
-                        Spacer(Modifier.height(16.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    }
+                }
+
+                if (showReminderDialog) {
+                    ReminderDialog(
+                        onDismiss = { showReminderDialog = false },
+                        onConfirm = { millis, deleteAfterReminder ->
+                            scheduleReminder(millis, deleteAfterReminder)
+                            showReminderDialog = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun ShareSheetContent(
+        viewModel: ShareViewModel,
+        onSave: () -> Unit,
+        onCleanAndReshare: () -> Unit,
+        onRemind: () -> Unit,
+        onReshare: () -> Unit
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Filled.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text("Share Buddy", style = MaterialTheme.typography.headlineSmall)
+            }
+            Spacer(Modifier.height(16.dp))
+
+            if (viewModel.sharedImages.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (uri in viewModel.sharedImages) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
-                            Button(onClick = { onSave() }, enabled = !isSaving) {
-                                Icon(Icons.Filled.Save, contentDescription = "Save")
-                                Spacer(Modifier.width(6.dp))
-                                Text("Save")
-                            }
-                            Button(
-                                onClick = { onCleanAndReshare() },
-                                enabled = sharedText?.startsWith("http", ignoreCase = true) == true && !isSaving
-                            ) {
-                                Icon(Icons.Filled.Link, contentDescription = "Clean and re-share")
-                                Spacer(Modifier.width(6.dp))
-                                Text("Clean + Re-share")
-                            }
-                            OutlinedButton(onClick = { onRemind() }, enabled = !isSaving) {
-                                Icon(Icons.Filled.Alarm, contentDescription = "Remind")
-                                Spacer(Modifier.width(6.dp))
-                                Text("Remind")
-                            }
-                            OutlinedButton(onClick = { onReshare() }) {
-                                Icon(Icons.Filled.Share, contentDescription = "Re-share")
-                                Spacer(Modifier.width(6.dp))
-                                Text("Re-share")
-                            }
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Shared image",
+                                modifier = Modifier.size(100.dp)
+                            )
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Tip: You can find saved items in the Share Buddy app.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    if (showReminderDialog) {
-                        ReminderDialog(
-                            onDismiss = { showReminderDialog = false },
-                            onConfirm = { millis, deleteAfterReminder ->
-                                scheduleReminder(millis, deleteAfterReminder)
-                                showReminderDialog = false
-                            }
-                        )
                     }
                 }
+            } else {
+                val preview = viewModel.sharedText ?: ""
+                Text(
+                    preview, 
+                    maxLines = 4, 
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
+            Spacer(Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = viewModel.labelText,
+                onValueChange = { viewModel.labelText = it },
+                label = { Text("Label (optional)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
+            )
+            Spacer(Modifier.height(24.dp))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(onClick = onSave, enabled = !viewModel.isSaving) {
+                    Icon(Icons.Filled.Save, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save")
+                }
+                Button(
+                    onClick = onCleanAndReshare,
+                    enabled = viewModel.sharedText?.startsWith("http", ignoreCase = true) == true && !viewModel.isSaving
+                ) {
+                    Icon(Icons.Filled.Link, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Clean + Re-share")
+                }
+                OutlinedButton(onClick = onRemind, enabled = !viewModel.isSaving) {
+                    Icon(Icons.Filled.Alarm, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remind")
+                }
+                OutlinedButton(onClick = onReshare) {
+                    Icon(Icons.Filled.Share, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Re-share")
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Tip: You can find saved items in the Share Buddy app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun parseShare(i: Intent?) {
-        when (i?.action) {
-            Intent.ACTION_SEND -> {
-                val type = i.type ?: ""
-                if (type.startsWith("text")) {
-                    sharedText = i.getStringExtra(Intent.EXTRA_TEXT)
-                } else if (type.startsWith("image")) {
-                    val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                    } else {
-                        i.getParcelableExtra(Intent.EXTRA_STREAM)
-                    }
-                    (uri as? Uri)?.let { sharedImages = listOf(it) }
-                }
-            }
-            Intent.ACTION_SEND_MULTIPLE -> {
-                val uris = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                } else {
-                    i.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
-                }
-                if (!uris.isNullOrEmpty()) sharedImages = uris
-            }
-        }
-    }
-
-    // ✅ Single source of truth for saving; prevents duplicate items
-    private suspend fun ensureSaved(): String? {
-        if (lastSavedItemId != null) return lastSavedItemId
-        isSaving = true
+    private fun getSafeCallingPackage(): String? {
         return try {
-            val currentLabel = labelText.ifBlank { null }
-            val savedItem = when {
-                !sharedText.isNullOrBlank() ->
-                    repo.saveTextOrLink(sharedText!!.trim(), sourcePkg = callingPackage, label = currentLabel)
-                sharedImages.isNotEmpty() ->
-                    repo.saveImages(sharedImages, sourcePkg = callingPackage, label = currentLabel)
-                else -> null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                this.callingPackage
+            } else {
+                @Suppress("DEPRECATION")
+                this.callingPackage
             }
-            lastSavedItemId = savedItem?.id
-            lastSavedItemId
-        } finally {
-            isSaving = false
+        } catch (_: Exception) {
+            null
         }
     }
 
     private fun onSave() {
-        if (isSaving) return
         lifecycleScope.launch {
-            val id = ensureSaved()
+            val id = viewModel.save(getSafeCallingPackage())
             if (id != null) {
                 Toast.makeText(this@ShareBuddyActivity, "Saved", Toast.LENGTH_SHORT).show()
-                // Keep screen open so user can set a reminder
+                // Auto-finish after short delay? Or let user stay to set reminder?
             } else {
                 Toast.makeText(this@ShareBuddyActivity, "Nothing to save", Toast.LENGTH_SHORT).show()
                 finish()
@@ -204,7 +214,7 @@ class ShareBuddyActivity : ComponentActivity() {
 
     private fun onCleanAndReshare() {
         lifecycleScope.launch {
-            val t = sharedText ?: return@launch
+            val t = viewModel.sharedText ?: return@launch
             val cleaned = com.mrunicorn.sb.util.LinkCleaner.clean(t.trim())
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -225,7 +235,7 @@ class ShareBuddyActivity : ComponentActivity() {
 
     private fun scheduleReminder(timeInMillis: Long, deleteAfterReminder: Boolean) {
         lifecycleScope.launch {
-            val id = ensureSaved()
+            val id = viewModel.save(getSafeCallingPackage())
             if (id == null) {
                 Toast.makeText(this@ShareBuddyActivity, "Nothing to save for reminder", Toast.LENGTH_SHORT).show()
                 finish()
@@ -234,17 +244,17 @@ class ShareBuddyActivity : ComponentActivity() {
 
             val now = System.currentTimeMillis()
             val whenAt = now + timeInMillis
-            val title = sharedText?.take(80) ?: "New reminder"
-            val itemLabel = labelText.ifBlank { null }
+            val title = viewModel.sharedText?.take(80) ?: "New reminder"
 
-            repo.setReminder(id, whenAt)
+            viewModel.setReminder(id, whenAt, deleteAfterReminder)
+
             ReminderScheduler.schedule(
                 this@ShareBuddyActivity,
                 itemId = id,
                 title = title,
                 whenAt = whenAt,
                 deleteAfterReminder = deleteAfterReminder,
-                label = itemLabel
+                label = viewModel.labelText.ifBlank { null }
             )
             Toast.makeText(this@ShareBuddyActivity, "Reminder set!", Toast.LENGTH_SHORT).show()
             finish()
@@ -252,17 +262,17 @@ class ShareBuddyActivity : ComponentActivity() {
     }
 
     private fun onReshare() {
-        if (!sharedText.isNullOrBlank()) {
+        if (!viewModel.sharedText.isNullOrBlank()) {
             val share = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, sharedText!!.trim())
+                putExtra(Intent.EXTRA_TEXT, viewModel.sharedText!!.trim())
             }
             startActivity(Intent.createChooser(share, "Share"))
             finish()
-        } else if (sharedImages.isNotEmpty()) {
+        } else if (viewModel.sharedImages.isNotEmpty()) {
             val share = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                 type = "image/*"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(sharedImages))
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(viewModel.sharedImages))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(share, "Share images"))

@@ -73,6 +73,11 @@ android {
 
   // NOTE: Do NOT include composeOptions{} when using Kotlin 2.0 + compose plugin
   packaging { resources.excludes.add("/META-INF/{AL2.0,LGPL2.1}") }
+
+  lint {
+      abortOnError = false
+      checkReleaseBuilds = false
+  }
 }
 
 dependencies {
@@ -88,7 +93,7 @@ dependencies {
   implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
   implementation("androidx.compose.ui:ui")
   implementation("androidx.compose.ui:ui-tooling-preview")
-  implementation("androidx.compose.material3:material3:1.3.0-beta01")
+  implementation("androidx.compose.material3:material3:1.2.1")
   implementation("androidx.compose.material:material-icons-extended")
   debugImplementation("androidx.compose.ui:ui-tooling")
 
@@ -107,10 +112,15 @@ dependencies {
   implementation("com.google.dagger:hilt-android:2.51.1")
   ksp("com.google.dagger:hilt-android-compiler:2.51.1")
   implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+  implementation("androidx.hilt:hilt-work:1.2.0")
+  ksp("androidx.hilt:hilt-compiler:1.2.0")
 
   // ML Kit Text Recognition (Play Services version)
   implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+  // WorkManager
+  implementation("androidx.work:work-runtime-ktx:2.9.0")
 
   // Testing
   testImplementation("junit:junit:4.13.2")

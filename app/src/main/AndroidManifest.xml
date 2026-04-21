@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
   <application
       android:name=".App"
       android:allowBackup="false"
@@ -6,6 +7,17 @@
       android:icon="@mipmap/ic_launcher"
       android:roundIcon="@mipmap/ic_launcher_round"
       android:theme="@style/Theme.ShareBuddy">
+
+    <provider
+        android:name="androidx.startup.InitializationProvider"
+        android:authorities="${applicationId}.androidx-startup"
+        android:exported="false"
+        tools:node="merge">
+        <meta-data
+            android:name="androidx.work.WorkManagerInitializer"
+            android:value="androidx.startup"
+            tools:node="remove" />
+    </provider>
 
 
     <activity
@@ -19,6 +31,7 @@
 
     <activity
         android:name=".share.ShareBuddyActivity"
+        android:theme="@style/Theme.ShareBuddy.Transparent"
         android:exported="true"
         android:launchMode="singleTop"
         android:taskAffinity="">
@@ -62,8 +75,4 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.INTERNET" />
-  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-  <!-- For Android 13+ (API 33/34) -->
-  <uses-permission android:name="android.permission.USE_EXACT_ALARM" /> 
-
 </manifest>

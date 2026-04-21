@@ -13,10 +13,27 @@ import com.mrunicorn.sb.util.LinkThumbnailExtractor
 import com.mrunicorn.sb.util.TextExtractor
 import kotlinx.coroutines.flow.Flow
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.UUID
+
+import androidx.work.Data
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.mrunicorn.sb.util.OcrWorker
+
 class Repository(private val context: Context, val dao: ItemDao) {
 
-    fun inbox(query: String?): Flow<List<Item>> =
-        if (query.isNullOrBlank()) dao.observeAll() else dao.search(query)
+    fun inbox(query: String?, filter: ItemFilter, sort: ItemSort): Flow<List<Item>> {
+        val type = when (filter) {
+            ItemFilter.All -> null
+            ItemFilter.Links -> ItemType.LINK
+            ItemFilter.Text -> ItemType.TEXT
+            ItemFilter.Images -> ItemType.IMAGE
+        }
+        val sortBy = sort.name
+        return dao.observeFiltered(query?.ifBlank { null }, type, sortBy)
+    }
 
     suspend fun saveTextOrLink(raw: String, sourcePkg: String? = null, label: String? = null): Item {
         val trimmed = raw.trim()
@@ -36,7 +53,7 @@ class Repository(private val context: Context, val dao: ItemDao) {
         uris: List<Uri>,
         sourcePkg: String? = null,
         label: String? = null
-    ): Item {
+    ): Item = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
         val mtm = MimeTypeMap.getSingleton()
 
@@ -61,7 +78,7 @@ class Repository(private val context: Context, val dao: ItemDao) {
                 if (ext != null) {
                     // (Optional, but recommended) keep images in a subfolder
                     val imagesDir = File(context.filesDir, "images").apply { mkdirs() }
-                    val fileName = "image_${System.currentTimeMillis()}.$ext"
+                    val fileName = "image_${System.currentTimeMillis()}_${UUID.randomUUID()}.$ext"
                     val file = File(imagesDir, fileName)
 
                     resolver.openInputStream(src)?.use { input ->
@@ -91,19 +108,23 @@ class Repository(private val context: Context, val dao: ItemDao) {
             }
         }
  
-        val ocrText = if (imageUrisToSave.isNotEmpty()) {
-            TextExtractor.extractText(context, imageUrisToSave.first())
-        } else null
-
         val item = Item(
             type = ItemType.IMAGE,
-            text = ocrText,
+            text = null, // OCR in background
             imageUris = imageUrisToSave,
             sourcePackage = sourcePkg,
             label = label
         )
         dao.upsert(item)
-        return item
+
+        // Enqueue OCR background work
+        val data = Data.Builder().putString(OcrWorker.KEY_ITEM_ID, item.id).build()
+        val request = OneTimeWorkRequestBuilder<OcrWorker>()
+            .setInputData(data)
+            .build()
+        WorkManager.getInstance(context).enqueue(request)
+
+        item
     }
 
     suspend fun delete(id: String) = dao.delete(id)
@@ -119,7 +140,8 @@ class Repository(private val context: Context, val dao: ItemDao) {
         }
     }
 
-    suspend fun setReminder(id: String, reminderAt: Long?) = dao.setReminder(id, reminderAt)
+    suspend fun setReminder(id: String, reminderAt: Long?, deleteAfter: Boolean = false) = 
+        dao.setReminder(id, reminderAt, deleteAfter)
 
     fun copyToClipboard(text: String) {
         val cm = context.getSystemService(ClipboardManager::class.java)

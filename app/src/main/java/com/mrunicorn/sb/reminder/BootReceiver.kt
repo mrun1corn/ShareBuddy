@@ -6,10 +6,10 @@ import android.content.Intent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.mrunicorn.sb.data.Repository
+import com.mrunicorn.sb.reminder.ReminderScheduler
 
 /**
  * Reschedules existing reminders after device reboot.
@@ -20,17 +20,26 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            // Reschedule reminders in background
+            val pendingResult = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val app = context.applicationContext as com.mrunicorn.sb.App
-                    val items = app.repo.dao.observeAllOnce() // small helper to get current items snapshot
-                    items.filter { it.reminderAt != null && it.reminderAt!! > System.currentTimeMillis() }
-                        .forEach { item ->
-                            val title = item.cleanedText?.take(80) ?: item.text?.take(80) ?: "Reminder"
-                            ReminderScheduler.schedule(context, item.id, title, item.reminderAt!!, false, item.label)
-                        }
-                } catch (_: Exception) {
+                    val now = System.currentTimeMillis()
+                    val items = repo.dao.getPendingReminders(now)
+                    items.forEach { item ->
+                        val title = item.cleanedText?.take(80) ?: item.text?.take(80) ?: "Reminder"
+                        ReminderScheduler.schedule(
+                            context,
+                            item.id,
+                            title,
+                            item.reminderAt!!,
+                            item.deleteAfterReminder,
+                            item.label
+                        )
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    pendingResult.finish()
                 }
             }
         }

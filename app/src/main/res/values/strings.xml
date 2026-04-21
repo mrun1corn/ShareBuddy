@@ -1,3 +1,33 @@
 <resources>
     <string name="app_name">Share Buddy</string>
+    <string name="saved_count">%d saved</string>
+    <string name="search_hint">Search</string>
+    <string name="reset_filters">Reset filters</string>
+    <string name="change_sort_order">Change sort order</string>
+    <string name="no_matches">No matches for \"%s\"</string>
+    <string name="no_items_yet">No items yet — Share to Share Buddy from any app.</string>
+    <string name="label_optional">Label (optional)</string>
+    <string name="save">Save</string>
+    <string name="clean_reshare">Clean + Re-share</string>
+    <string name="remind">Remind</string>
+    <string name="reshare">Re-share</string>
+    <string name="tip_find_saved">Tip: You can find saved items in the Share Buddy app.</string>
+    <string name="saved_toast">Saved</string>
+    <string name="nothing_to_save">Nothing to save</string>
+    <string name="reminder_set_toast">Reminder set!</string>
+    <string name="reminder_cancelled_toast">Reminder cancelled</string>
+    <string name="copied_toast">Copied to clipboard</string>
+    <string name="deleted_toast">Deleted</string>
+    <string name="label_updated_toast">Label updated</string>
+    <string name="delete_item_q">Delete item?</string>
+    <string name="delete_confirm_msg">Are you sure you want to delete this item? This action can\'t be undone.</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="edit_label">Edit Label</string>
+    <string name="label">Label</string>
+    <string name="reminder_details">Reminder Details</string>
+    <string name="cancel_reminder">Cancel Reminder</string>
+    <string name="close">Close</string>
+    <string name="pinned">Pinned</string>
+    <string name="recent">Recent</string>
 </resources>
